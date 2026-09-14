@@ -1,0 +1,169 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Scriban templates are byte-exact; a trailing newline changes generator output.
+[*.sbn-cs]
+end_of_line = lf
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[*.{yaml,yml,json,jsonc,slnx}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Code quality (CA analyzer policy otherwise lives in Directory.Build.props)
+dotnet_diagnostic.CA1852.severity = warning
+
+# Language / style
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:warning
+csharp_preferred_modifier_order = public, private, protected, internal, file, new, static, abstract, virtual, sealed, readonly, override, extern, unsafe, volatile, async, required:suggestion
+csharp_new_line_before_members_in_object_initializers = false
+csharp_style_prefer_utf8_string_literals = true:suggestion
+csharp_style_var_for_built_in_types = false:silent
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = false:silent
+dotnet_style_parentheses_in_arithmetic_binary_operators = never_if_unnecessary:silent
+dotnet_style_parentheses_in_relational_binary_operators = never_if_unnecessary:silent
+dotnet_style_parentheses_in_other_binary_operators = always_for_clarity:silent
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
+
+# Naming
+dotnet_naming_rule.methods.severity = warning
+dotnet_naming_rule.methods.symbols = methods
+dotnet_naming_rule.methods.style = pascal_case_underscore_tolerant
+dotnet_naming_rule.private_constants.severity = warning
+dotnet_naming_rule.private_constants.symbols = private_constants
+dotnet_naming_rule.private_constants.style = pascal_case
+dotnet_naming_rule.private_static_readonly_fields.severity = warning
+dotnet_naming_rule.private_static_readonly_fields.symbols = private_static_readonly_fields
+dotnet_naming_rule.private_static_readonly_fields.style = pascal_case
+dotnet_naming_rule.private_static_fields.severity = warning
+dotnet_naming_rule.private_static_fields.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields.style = underscore_camel_case
+dotnet_naming_rule.private_instance_fields.severity = warning
+dotnet_naming_rule.private_instance_fields.symbols = private_instance_fields
+dotnet_naming_rule.private_instance_fields.style = underscore_camel_case
+
+dotnet_naming_symbols.methods.applicable_kinds = method
+dotnet_naming_symbols.methods.applicable_accessibilities = *
+dotnet_naming_symbols.private_constants.applicable_kinds = field
+dotnet_naming_symbols.private_constants.applicable_accessibilities = private
+dotnet_naming_symbols.private_constants.required_modifiers = const
+dotnet_naming_symbols.private_static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_readonly_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_readonly_fields.required_modifiers = static, readonly
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+dotnet_naming_symbols.private_instance_fields.applicable_kinds = field
+dotnet_naming_symbols.private_instance_fields.applicable_accessibilities = private
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+dotnet_naming_style.pascal_case_underscore_tolerant.capitalization = pascal_case
+dotnet_naming_style.pascal_case_underscore_tolerant.word_separator = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+# ReSharper / Rider formatter
+resharper_apply_auto_detected_rules = false
+resharper_autodetect_indent_settings = true
+resharper_use_indent_from_vs = false
+resharper_formatter_tags_enabled = true
+resharper_formatter_off_tag = @formatter:off
+resharper_formatter_on_tag = @formatter:on
+resharper_for_built_in_types = use_var_when_evident
+resharper_default_value_when_type_not_evident = default_expression
+resharper_braces_for_ifelse = required
+resharper_parentheses_non_obvious_operations = conditional, shift
+csharp_parentheses_redundancy_style = remove_if_not_clarifies_precedence
+
+# ReSharper / Rider inspections: style
+resharper_arrange_namespace_body_highlighting = warning
+resharper_arrange_modifiers_order_highlighting = warning
+resharper_arrange_missing_parentheses_highlighting = warning
+resharper_arrange_redundant_parentheses_highlighting = hint
+resharper_arrange_this_qualifier_highlighting = hint
+resharper_arrange_type_member_modifiers_highlighting = hint
+resharper_arrange_type_modifiers_highlighting = hint
+resharper_arrange_default_value_when_type_evident_highlighting = suggestion
+resharper_arrange_default_value_when_type_not_evident_highlighting = suggestion
+resharper_arrange_var_keywords_in_deconstructing_declaration_highlighting = warning
+resharper_built_in_type_reference_style_highlighting = hint
+resharper_built_in_type_reference_style_for_member_access_highlighting = hint
+resharper_enforce_if_statement_braces_highlighting = warning
+resharper_redundant_base_qualifier_highlighting = warning
+resharper_suggest_var_or_type_elsewhere_highlighting = warning
+resharper_suggest_var_or_type_simple_types_highlighting = warning
+resharper_use_object_or_collection_initializer_highlighting = warning
+resharper_simplify_string_interpolation_highlighting = warning
+resharper_string_literal_as_interpolation_argument_highlighting = warning
+resharper_convert_if_statement_to_return_statement_highlighting = hint
+resharper_replace_with_primary_constructor_parameter_highlighting = none
+resharper_unused_type_global_highlighting = suggestion
+
+# ReSharper / Rider inspections: bug prevention
+resharper_async_void_throw_exception_highlighting = warning
+resharper_async_override_method_without_await_highlighting = warning
+resharper_constant_expected_highlighting = warning
+resharper_double_negation_operator_highlighting = warning
+
+# ReSharper / Rider inspections: performance
+resharper_use_array_empty_method_highlighting = warning
+resharper_use_collection_count_property_highlighting = warning
+resharper_redundant_explicit_params_array_creation_highlighting = warning
+
+# ReSharper / Rider inspections: redundant code
+resharper_redundant_property_pattern_clause_highlighting = warning
+resharper_redundant_with_expression_highlighting = warning
+resharper_simplify_conditional_ternary_expression_highlighting = warning
+resharper_can_simplify_is_assignable_from_highlighting = warning
+resharper_overridden_with_same_value_highlighting = warning
+
+# ReSharper / Rider inspections: modernization
+resharper_use_nullable_annotation_instead_of_attribute_highlighting = warning
+resharper_method_has_async_overload_with_cancellation_highlighting = warning
+resharper_inline_out_variable_declaration_highlighting = warning
+resharper_use_unsigned_right_shift_operator_highlighting = warning
+resharper_use_with_expression_to_copy_tuple_highlighting = warning
+resharper_swap_via_deconstruction_highlighting = warning
+resharper_use_index_from_end_expression_highlighting = warning
+resharper_replace_with_field_keyword_highlighting = warning
+
+# ReSharper / Rider inspections: LINQ
+resharper_replace_with_of_type_any_1_highlighting = warning
+resharper_replace_with_of_type_any_2_highlighting = warning
+resharper_replace_with_of_type_single_1_highlighting = warning
+resharper_replace_with_of_type_single_2_highlighting = warning
+resharper_replace_with_last_or_default_1_highlighting = warning
+resharper_replace_with_last_or_default_2_highlighting = warning
+resharper_replace_with_last_or_default_3_highlighting = warning
+resharper_replace_with_last_or_default_4_highlighting = warning
+resharper_replace_with_single_call_to_single_highlighting = warning
+resharper_replace_with_simple_assignment_false_highlighting = warning
+
+# ReSharper / Rider inspections: API / design
+resharper_member_can_be_private_global_highlighting = warning
+resharper_property_can_be_made_init_only_global_highlighting = warning
+resharper_property_can_be_made_init_only_local_highlighting = warning
+resharper_class_with_virtual_members_never_inherited_local_highlighting = warning
+resharper_class_can_be_sealed_global_highlighting = warning
+resharper_class_can_be_sealed_local_highlighting = warning
+resharper_too_wide_local_variable_scope_highlighting = warning
+resharper_join_null_check_with_usage_highlighting = warning
+resharper_merge_nested_property_patterns_highlighting = warning

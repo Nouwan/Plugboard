@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <RootNamespace>SimpleEndpoints</RootNamespace>
+        <PackageId>SimpleEndpoints</PackageId>
+        <Description>SimpleEndpoints</Description>
+        <PackageTags>aspnetcore;minimal-api;endpoints;source-generator;analyzer</PackageTags>
+        <IsPackable>true</IsPackable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DevelopmentDependency>false</DevelopmentDependency>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Build ordering only; the generator + analyzer assembly ships inside this package under analyzers/dotnet/cs. -->
+        <ProjectReference Include="..\SimpleEndpoints.Generator\SimpleEndpoints.Generator.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all" />
+        <None Include="..\SimpleEndpoints.Generator\bin\$(Configuration)\netstandard2.0\SimpleEndpoints.Generator.dll"
+              Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    </ItemGroup>
+
+</Project>
