@@ -1,0 +1,20 @@
+name: Question
+description: You have something specific to achieve and the existing documentation doesn't cover it
+title: '[Question]: '
+labels: ['question']
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you wanting to achieve?
+      description: A clear and concise description of what you're trying to do.
+      placeholder: I am trying to do [...] but [...]
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add any other context related to your question here.
+    validations:
+      required: false
