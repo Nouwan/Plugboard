@@ -3,11 +3,11 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using SimpleEndpoints.Generator.Utils;
-using static SimpleEndpoints.Generator.Diagnostics;
-using static SimpleEndpoints.Generator.EndpointContracts;
+using Plugboard.Generator.Utils;
+using static Plugboard.Generator.Diagnostics;
+using static Plugboard.Generator.EndpointContracts;
 
-namespace SimpleEndpoints.Generator;
+namespace Plugboard.Generator;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class EndpointAnalyzer : DiagnosticAnalyzer

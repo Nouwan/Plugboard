@@ -2,16 +2,16 @@ using JetBrains.Annotations;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using SimpleEndpoints.Generator;
+using Plugboard.Generator;
 
-namespace SimpleEndpoints.Tests;
+namespace Plugboard.Tests;
 
 [TestFixture]
 internal sealed class EndpointAnalyzerTests
 {
     [Test]
     public Task Analyze_WithValidEndpointAndGroup_ShouldReportNothing() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
@@ -35,7 +35,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithEndpointMissingMapEndpoint_ShouldReportSE001() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
 
         [Endpoint]
         public static class {|SE001:BrokenEndpoint|} { }
@@ -43,7 +43,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithInstanceMapEndpoint_ShouldReportSE001() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
@@ -55,7 +55,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithWrongParameterType_ShouldReportSE001() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
@@ -67,7 +67,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithGroupMissingConfigure_ShouldReportSE002() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
 
         [EndpointGroup]
         public static class {|SE002:TodoGroup|} { }
@@ -75,7 +75,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithUnmarkedGroupType_ShouldReportSE003() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         public static class NotAGroup
@@ -92,7 +92,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithGenericEndpoint_ShouldReportSE004() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
@@ -104,7 +104,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithAbstractGroup_ShouldReportSE004() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
@@ -116,7 +116,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithDuplicateGroupNames_ShouldReportSE005() => Analyze("""
-        using SimpleEndpoints;
+        using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         namespace Features.Todos

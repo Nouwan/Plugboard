@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace SimpleEndpoints.Generator.Utils;
+namespace Plugboard.Generator.Utils;
 
 internal static class ITypeSymbolExtensions
 {

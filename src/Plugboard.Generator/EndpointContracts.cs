@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace SimpleEndpoints.Generator;
+namespace Plugboard.Generator;
 
 /// <summary>
 /// Contract checks shared by the generator and the analyzer. The analyzer reports violations;
@@ -8,8 +8,8 @@ namespace SimpleEndpoints.Generator;
 /// </summary>
 internal static class EndpointContracts
 {
-    public const string EndpointAttributeName = "SimpleEndpoints.EndpointAttribute";
-    public const string EndpointGroupAttributeName = "SimpleEndpoints.EndpointGroupAttribute";
+    public const string EndpointAttributeName = "Plugboard.EndpointAttribute";
+    public const string EndpointGroupAttributeName = "Plugboard.EndpointGroupAttribute";
     private const string RouteBuilderTypeName = "Microsoft.AspNetCore.Routing.IEndpointRouteBuilder";
     private const string RouteGroupBuilderTypeName = "Microsoft.AspNetCore.Routing.RouteGroupBuilder";
     private const string MapEndpointMethodName = "MapEndpoint";

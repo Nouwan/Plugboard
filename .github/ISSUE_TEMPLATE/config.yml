@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentation
-    url: https://github.com/Nouwan/SimpleEndpoints#readme
+    url: https://github.com/Nouwan/Plugboard#readme
     about: Usage, generated API surface and analyzer diagnostics are documented in the README.
