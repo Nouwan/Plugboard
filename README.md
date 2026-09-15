@@ -1,4 +1,4 @@
-# SimpleEndpoints
+# Plugboard
 
 Build your ASP.NET minimal API using one class per endpoint and leave the wiring up to us!
 
@@ -17,7 +17,7 @@ Just add the `[Endpoint]` attribute to a class and add a function with the signa
 ## Install
 
 ```shell
-dotnet add package SimpleEndpoints
+dotnet add package Plugboard
 ```
 
 ## Usage
@@ -25,7 +25,7 @@ dotnet add package SimpleEndpoints
 Standalone endpoint:
 
 ```csharp
-using SimpleEndpoints;
+using Plugboard;
 
 [Endpoint]
 public static class HealthEndpoint
@@ -38,7 +38,7 @@ public static class HealthEndpoint
 Grouped endpoints share one `RouteGroupBuilder`:
 
 ```csharp
-using SimpleEndpoints;
+using Plugboard;
 
 [EndpointGroup]
 public static class TodoGroup
@@ -87,7 +87,7 @@ Classes may be `static`, or any non-abstract, non-generic class.
 ```shell
 dotnet build
 dotnet test
-dotnet pack src/SimpleEndpoints -c Release
+dotnet pack src/Plugboard -c Release
 ```
 
 ## License

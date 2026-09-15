@@ -4,9 +4,9 @@ using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
-using SimpleEndpoints.Generator;
+using Plugboard.Generator;
 
-namespace SimpleEndpoints.Tests;
+namespace Plugboard.Tests;
 
 [TestFixture]
 internal sealed class EndpointRegistrationGeneratorTests
@@ -15,7 +15,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
         namespace TestProject.Features.Health
         {
-            using SimpleEndpoints;
+            using Plugboard;
             using Microsoft.AspNetCore.Routing;
 
             [Endpoint]
@@ -30,7 +30,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
         namespace TestProject.Features.Todos
         {
-            using SimpleEndpoints;
+            using Plugboard;
             using Microsoft.AspNetCore.Routing;
 
             [EndpointGroup]
@@ -107,7 +107,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
             namespace TestProject.Features.Admin
             {
-                using SimpleEndpoints;
+                using Plugboard;
                 using Microsoft.AspNetCore.Routing;
 
                 [EndpointGroup]
@@ -186,7 +186,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
             namespace TestProject.Features.Misc
             {
-                using SimpleEndpoints;
+                using Plugboard;
                 using Microsoft.AspNetCore.Routing;
 
                 [Endpoint]
@@ -232,7 +232,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
             namespace TestProject.Features.Other
             {
-                using SimpleEndpoints;
+                using Plugboard;
                 using Microsoft.AspNetCore.Routing;
 
                 [EndpointGroup]
@@ -269,7 +269,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
         namespace TestProject
         {
-            using SimpleEndpoints;
+            using Plugboard;
 
             [Endpoint]
             public static class BrokenEndpoint { }
@@ -281,7 +281,7 @@ internal sealed class EndpointRegistrationGeneratorTests
 
         namespace TestProject
         {
-            using SimpleEndpoints;
+            using Plugboard;
             using Microsoft.AspNetCore.Routing;
 
             public static class NotAGroup

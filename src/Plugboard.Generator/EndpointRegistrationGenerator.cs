@@ -1,10 +1,10 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using SimpleEndpoints.Generator.Utils;
-using static SimpleEndpoints.Generator.EndpointContracts;
+using Plugboard.Generator.Utils;
+using static Plugboard.Generator.EndpointContracts;
 
-namespace SimpleEndpoints.Generator;
+namespace Plugboard.Generator;
 
 [Generator]
 public sealed class EndpointRegistrationGenerator : IIncrementalGenerator

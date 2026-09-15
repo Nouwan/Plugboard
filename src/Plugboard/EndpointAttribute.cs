@@ -1,4 +1,4 @@
-namespace SimpleEndpoints;
+namespace Plugboard;
 
 /// <summary>
 /// Marks a class as an endpoint. The class must declare

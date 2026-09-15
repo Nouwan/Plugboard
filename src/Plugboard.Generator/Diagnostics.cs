@@ -1,10 +1,10 @@
 using Microsoft.CodeAnalysis;
 
-namespace SimpleEndpoints.Generator;
+namespace Plugboard.Generator;
 
 internal static class Diagnostics
 {
-    private const string Category = "SimpleEndpoints";
+    private const string Category = "Plugboard";
 
     public static readonly DiagnosticDescriptor MissingMapEndpoint = new(
         id: "SE001",

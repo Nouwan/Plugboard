@@ -2,8 +2,8 @@
 
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
-        <RootNamespace>SimpleEndpoints.Generator</RootNamespace>
-        <AssemblyName>SimpleEndpoints.Generator</AssemblyName>
+        <RootNamespace>Plugboard.Generator</RootNamespace>
+        <AssemblyName>Plugboard.Generator</AssemblyName>
         <IsPackable>false</IsPackable>
         <IsRoslynComponent>true</IsRoslynComponent>
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>

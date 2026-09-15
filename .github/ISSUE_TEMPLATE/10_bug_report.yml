@@ -47,7 +47,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: SimpleEndpoints version
+      label: Plugboard version
       placeholder: 0.1.0
     validations:
       required: true
@@ -63,7 +63,7 @@ body:
     id: tfm
     attributes:
       label: Target framework
-      description: Target framework(s) of the project using SimpleEndpoints.
+      description: Target framework(s) of the project using Plugboard.
       placeholder: net10.0
     validations:
       required: false

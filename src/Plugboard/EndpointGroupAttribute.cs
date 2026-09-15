@@ -1,4 +1,4 @@
-namespace SimpleEndpoints;
+namespace Plugboard;
 
 /// <summary>
 /// Marks a class as a route group. The class must declare
