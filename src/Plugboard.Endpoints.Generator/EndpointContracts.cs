@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace Plugboard.Generator;
+namespace Plugboard.Endpoints.Generator;
 
 /// <summary>
 /// Contract checks shared by the generator and the analyzer. The analyzer reports violations;

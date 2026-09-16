@@ -1,4 +1,4 @@
-# Plugboard
+a# Plugboard
 
 Build your ASP.NET minimal API using one class per endpoint and leave the wiring up to us!
 
@@ -17,7 +17,7 @@ Just add the `[Endpoint]` attribute to a class and add a function with the signa
 ## Install
 
 ```shell
-dotnet add package Plugboard
+dotnet add package Plugboard.Endpoints
 ```
 
 ## Usage
@@ -76,18 +76,18 @@ Classes may be `static`, or any non-abstract, non-generic class.
 
 | Id      | Source   | Message                                                                                                      |
 |---------|----------|--------------------------------------------------------------------------------------------------------------|
-| `SE001` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                  |
-| `SE002` | analyzer | `[EndpointGroup]` class must declare `public static void Configure(RouteGroupBuilder group)`                 |
-| `SE003` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                     |
-| `SE004` | analyzer | Endpoint or group type is generic or abstract                                                                |
-| `SE005` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide |
+| `PB001` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                  |
+| `PB002` | analyzer | `[EndpointGroup]` class must declare `public static void Configure(RouteGroupBuilder group)`                 |
+| `PB003` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                     |
+| `PB004` | analyzer | Endpoint or group type is generic or abstract                                                                |
+| `PB005` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide |
 
 ## Build
 
 ```shell
 dotnet build
 dotnet test
-dotnet pack src/Plugboard -c Release
+dotnet pack src/Plugboard.Endpoints -c Release
 ```
 
 ## License

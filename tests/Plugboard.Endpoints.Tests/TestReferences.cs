@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.Testing;
 
-namespace Plugboard.Tests;
+namespace Plugboard.Endpoints.Tests;
 
 internal static class TestReferences
 {

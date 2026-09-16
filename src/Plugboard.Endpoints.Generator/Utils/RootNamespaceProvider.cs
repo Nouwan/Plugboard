@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace Plugboard.Generator.Utils;
+namespace Plugboard.Endpoints.Generator.Utils;
 
 internal static class RootNamespaceProvider
 {
