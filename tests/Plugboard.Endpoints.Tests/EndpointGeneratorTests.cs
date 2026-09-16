@@ -4,12 +4,12 @@ using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
-using Plugboard.Generator;
+using Plugboard.Endpoints.Generator;
 
-namespace Plugboard.Tests;
+namespace Plugboard.Endpoints.Tests;
 
 [TestFixture]
-internal sealed class EndpointRegistrationGeneratorTests
+internal sealed class EndpointGeneratorTests
 {
     private const string HealthEndpoint = """
 
@@ -331,7 +331,7 @@ internal sealed class EndpointRegistrationGeneratorTests
     [AssertionMethod]
     private static Task Generate(string source, string? expected = null, string rootNamespace = "TestAssembly")
     {
-        var test = new CSharpSourceGeneratorTest<EndpointRegistrationGenerator, DefaultVerifier>
+        var test = new CSharpSourceGeneratorTest<EndpointGenerator, DefaultVerifier>
         {
             TestCode = source,
             ReferenceAssemblies = TestReferences.Net80AspNetCore
@@ -347,7 +347,7 @@ internal sealed class EndpointRegistrationGeneratorTests
         // No expected text means the generator must emit nothing; the framework asserts the exact set of generated files.
         if (expected is not null)
         {
-            test.TestState.GeneratedSources.Add((typeof(EndpointRegistrationGenerator), "EndpointRegistration.g.cs",
+            test.TestState.GeneratedSources.Add((typeof(EndpointGenerator), "EndpointRegistration.g.cs",
                 SourceText.From(expected.ReplaceLineEndings("\n"), Encoding.UTF8)));
         }
 

@@ -2,9 +2,9 @@ using JetBrains.Annotations;
 using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
-using Plugboard.Generator;
+using Plugboard.Endpoints.Generator;
 
-namespace Plugboard.Tests;
+namespace Plugboard.Endpoints.Tests;
 
 [TestFixture]
 internal sealed class EndpointAnalyzerTests
@@ -34,47 +34,47 @@ internal sealed class EndpointAnalyzerTests
         """);
 
     [Test]
-    public Task Analyze_WithEndpointMissingMapEndpoint_ShouldReportSE001() => Analyze("""
+    public Task Analyze_WithEndpointMissingMapEndpoint_ShouldReportPB001() => Analyze("""
         using Plugboard;
 
         [Endpoint]
-        public static class {|SE001:BrokenEndpoint|} { }
+        public static class {|PB001:BrokenEndpoint|} { }
         """);
 
     [Test]
-    public Task Analyze_WithInstanceMapEndpoint_ShouldReportSE001() => Analyze("""
+    public Task Analyze_WithInstanceMapEndpoint_ShouldReportPB001() => Analyze("""
         using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
-        public sealed class {|SE001:BrokenEndpoint|}
+        public sealed class {|PB001:BrokenEndpoint|}
         {
             public void MapEndpoint(IEndpointRouteBuilder app) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithWrongParameterType_ShouldReportSE001() => Analyze("""
+    public Task Analyze_WithWrongParameterType_ShouldReportPB001() => Analyze("""
         using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
-        public static class {|SE001:BrokenEndpoint|}
+        public static class {|PB001:BrokenEndpoint|}
         {
             public static void MapEndpoint(RouteGroupBuilder app) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithGroupMissingConfigure_ShouldReportSE002() => Analyze("""
+    public Task Analyze_WithGroupMissingConfigure_ShouldReportPB002() => Analyze("""
         using Plugboard;
 
         [EndpointGroup]
-        public static class {|SE002:TodoGroup|} { }
+        public static class {|PB002:TodoGroup|} { }
         """);
 
     [Test]
-    public Task Analyze_WithUnmarkedGroupType_ShouldReportSE003() => Analyze("""
+    public Task Analyze_WithUnmarkedGroupType_ShouldReportPB003() => Analyze("""
         using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
@@ -83,7 +83,7 @@ internal sealed class EndpointAnalyzerTests
             public static void Configure(RouteGroupBuilder group) { }
         }
 
-        [{|SE003:Endpoint(typeof(NotAGroup))|}]
+        [{|PB003:Endpoint(typeof(NotAGroup))|}]
         public static class OrphanEndpoint
         {
             public static void MapEndpoint(IEndpointRouteBuilder app) { }
@@ -91,38 +91,38 @@ internal sealed class EndpointAnalyzerTests
         """);
 
     [Test]
-    public Task Analyze_WithGenericEndpoint_ShouldReportSE004() => Analyze("""
+    public Task Analyze_WithGenericEndpoint_ShouldReportPB004() => Analyze("""
         using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
-        public static class {|SE004:GenericEndpoint|}<T>
+        public static class {|PB004:GenericEndpoint|}<T>
         {
             public static void MapEndpoint(IEndpointRouteBuilder app) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithAbstractGroup_ShouldReportSE004() => Analyze("""
+    public Task Analyze_WithAbstractGroup_ShouldReportPB004() => Analyze("""
         using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
-        public abstract class {|SE004:AbstractGroup|}
+        public abstract class {|PB004:AbstractGroup|}
         {
             public static void Configure(RouteGroupBuilder group) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithDuplicateGroupNames_ShouldReportSE005() => Analyze("""
+    public Task Analyze_WithDuplicateGroupNames_ShouldReportPB005() => Analyze("""
         using Plugboard;
         using Microsoft.AspNetCore.Routing;
 
         namespace Features.Todos
         {
             [EndpointGroup]
-            public static class {|SE005:TodoGroup|}
+            public static class {|PB005:TodoGroup|}
             {
                 public static void Configure(RouteGroupBuilder group) { }
             }
@@ -131,7 +131,7 @@ internal sealed class EndpointAnalyzerTests
         namespace Features.Other
         {
             [EndpointGroup]
-            public static class {|SE005:TodoGroup|}
+            public static class {|PB005:TodoGroup|}
             {
                 public static void Configure(RouteGroupBuilder group) { }
             }

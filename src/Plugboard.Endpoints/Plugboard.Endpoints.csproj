@@ -3,8 +3,8 @@
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
         <RootNamespace>Plugboard</RootNamespace>
-        <PackageId>Plugboard</PackageId>
-        <Description>Plugboard</Description>
+        <PackageId>Plugboard.Endpoints</PackageId>
+        <Description>Source-generated endpoint registration for ASP.NET Core minimal APIs: wiring generated at build.</Description>
         <PackageTags>aspnetcore;minimal-api;endpoints;source-generator;analyzer</PackageTags>
         <IsPackable>true</IsPackable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -13,9 +13,9 @@
 
     <ItemGroup>
         <!-- Build ordering only; the generator + analyzer assembly ships inside this package under analyzers/dotnet/cs. -->
-        <ProjectReference Include="..\Plugboard.Generator\Plugboard.Generator.csproj"
+        <ProjectReference Include="..\Plugboard.Endpoints.Generator\Plugboard.Endpoints.Generator.csproj"
                           ReferenceOutputAssembly="false" PrivateAssets="all" />
-        <None Include="..\Plugboard.Generator\bin\$(Configuration)\netstandard2.0\Plugboard.Generator.dll"
+        <None Include="..\Plugboard.Endpoints.Generator\bin\$(Configuration)\netstandard2.0\Plugboard.Endpoints.Generator.dll"
               Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
         <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
     </ItemGroup>

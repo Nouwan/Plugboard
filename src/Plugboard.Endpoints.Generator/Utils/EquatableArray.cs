@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
-namespace Plugboard.Generator.Utils;
+namespace Plugboard.Endpoints.Generator.Utils;
 
 internal static class EquatableArray
 {

@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <RootNamespace>Plugboard.Tests</RootNamespace>
+        <RootNamespace>Plugboard.Endpoints.Tests</RootNamespace>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
         <OutputType>Exe</OutputType>
@@ -25,8 +25,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Plugboard\Plugboard.csproj" />
-        <ProjectReference Include="..\..\src\Plugboard.Generator\Plugboard.Generator.csproj" />
+        <ProjectReference Include="..\..\src\Plugboard.Endpoints\Plugboard.Endpoints.csproj" />
+        <ProjectReference Include="..\..\src\Plugboard.Endpoints.Generator\Plugboard.Endpoints.Generator.csproj" />
     </ItemGroup>
 
 </Project>

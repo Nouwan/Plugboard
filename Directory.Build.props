@@ -11,5 +11,18 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <RepositoryType>git</RepositoryType>
+        <RepositoryUrl>https://github.com/Nouwan/Plugboard</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/Nouwan/Plugboard</PackageProjectUrl>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    </PropertyGroup>
+
+    <!-- Versioning: MinVer derives the version from git tags.
+         Stable release:  vX.Y.Z tag on main.
+         Preview release: vX.Y.Z-preview.N tag on main.
+         Untagged commits get X.Y.(Z+1)-preview.0.<height>, so local/CI builds never collide with a release. -->
+    <PropertyGroup>
+        <MinVerTagPrefix>v</MinVerTagPrefix>
+        <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
     </PropertyGroup>
 </Project>

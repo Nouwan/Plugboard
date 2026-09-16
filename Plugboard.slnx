@@ -1,10 +1,10 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Plugboard/Plugboard.csproj" />
-    <Project Path="src/Plugboard.Generator/Plugboard.Generator.csproj" />
+    <Project Path="src/Plugboard.Endpoints/Plugboard.Endpoints.csproj" />
+    <Project Path="src/Plugboard.Endpoints.Generator/Plugboard.Endpoints.Generator.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Plugboard.Tests/Plugboard.Tests.csproj" />
+    <Project Path="tests/Plugboard.Endpoints.Tests/Plugboard.Endpoints.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

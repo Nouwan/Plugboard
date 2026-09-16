@@ -1,13 +1,13 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using Plugboard.Generator.Utils;
-using static Plugboard.Generator.EndpointContracts;
+using Plugboard.Endpoints.Generator.Utils;
+using static Plugboard.Endpoints.Generator.EndpointContracts;
 
-namespace Plugboard.Generator;
+namespace Plugboard.Endpoints.Generator;
 
 [Generator]
-public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
+public sealed class EndpointGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
@@ -91,7 +91,6 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         context.AddSource("EndpointRegistration.g.cs", rendered);
     }
 
-    /// <summary>Group simple names that occur more than once; their Register{Name}() methods would collide, so they are left out. The analyzer reports SE005.</summary>
     private static HashSet<string> CollidingNames(List<GroupInfo> groups) =>
         new(groups.GroupBy(static g => g.Name, StringComparer.Ordinal)
                 .Where(static g => g.Count() > 1)

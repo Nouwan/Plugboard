@@ -4,7 +4,7 @@ using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using Scriban;
 
-namespace Plugboard.Generator.Utils;
+namespace Plugboard.Endpoints.Generator.Utils;
 
 /// <summary>
 /// Renders the embedded Scriban templates. Templates are located by name suffix, so the manifest resource name

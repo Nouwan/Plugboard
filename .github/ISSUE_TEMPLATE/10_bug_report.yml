@@ -31,7 +31,7 @@ body:
       description: |
         What actually happens.
         For generator issues include the generated file from `obj/` (enable `<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>`).
-        For analyzer issues include the diagnostic id (`SE00x`) and message.
+        For analyzer issues include the diagnostic id (`PB00x`) and message.
     validations:
       required: false
   - type: textarea
