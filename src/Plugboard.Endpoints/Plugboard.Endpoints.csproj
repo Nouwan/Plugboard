@@ -4,7 +4,7 @@
         <TargetFramework>netstandard2.0</TargetFramework>
         <RootNamespace>Plugboard</RootNamespace>
         <PackageId>Plugboard.Endpoints</PackageId>
-        <Description>Source-generated endpoint registration for ASP.NET Core minimal APIs: one class per endpoint, wiring generated at build.</Description>
+        <Description>Source-generated endpoint registration for ASP.NET Core minimal APIs: wiring generated at build.</Description>
         <PackageTags>aspnetcore;minimal-api;endpoints;source-generator;analyzer</PackageTags>
         <IsPackable>true</IsPackable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
