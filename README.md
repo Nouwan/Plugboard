@@ -1,4 +1,4 @@
-a# Plugboard
+# Plugboard
 
 Build your ASP.NET minimal API using one class per endpoint and leave the wiring up to us!
 
