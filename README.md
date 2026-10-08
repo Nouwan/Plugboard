@@ -72,15 +72,28 @@ Generated into your project's `RootNamespace` as `internal static` extensions on
 
 Classes may be `static`, or any non-abstract, non-generic class.
 
+### Contracts
+
+Mark the types your endpoints consume and return with `[Contract]` to show they are part of your contract to the
+outside world:
+
+```csharp
+[Contract]
+public sealed record TodoResponse(int Id, string Title);
+```
+
+Members of a contract are only used through serialization, so JetBrains Rider and ReSharper would report them as
+unused. `[Contract]` carries `[MeansImplicitUse]` for the type and all its members, so those warnings are not reported.
+
 ## Diagnostics
 
-| Id      | Source   | Message                                                                                                      |
-|---------|----------|--------------------------------------------------------------------------------------------------------------|
-| `PB101` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                  |
+| Id      | Source   | Message                                                                                                            |
+|---------|----------|--------------------------------------------------------------------------------------------------------------------|
+| `PB101` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                        |
 | `PB102` | analyzer | `[EndpointGroup]` class must declare `public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app)` |
-| `PB103` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                     |
-| `PB104` | analyzer | Endpoint or group type is generic or abstract                                                                |
-| `PB105` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide |
+| `PB103` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                           |
+| `PB104` | analyzer | Endpoint or group type is generic or abstract                                                                      |
+| `PB105` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide       |
 
 ## Build
 
