@@ -1,15 +1,10 @@
 using System.Collections.Concurrent;
-using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis.Text;
 using Scriban;
 
 namespace Plugboard.Endpoints.Generator.Utils;
 
-/// <summary>
-/// Renders the embedded Scriban templates. Templates are located by name suffix, so the manifest resource name
-/// may carry any RootNamespace/folder prefix. Parsed templates are cached per name.
-/// </summary>
 internal static class TemplateTools
 {
     private static readonly ConcurrentDictionary<string, Template> TemplateCache = new(StringComparer.Ordinal);
@@ -35,15 +30,11 @@ internal static class TemplateTools
 
     private static string ReadEmbeddedTemplate(string templateName)
     {
-        Assembly assembly = typeof(TemplateTools).Assembly;
-        var suffix = $".Templates.{templateName}.sbn-cs";
+        var resourceName = $"{templateName}.sbn-cs";
 
-        string resourceName = assembly.GetManifestResourceNames()
-                .SingleOrDefault(name => name.EndsWith(suffix, StringComparison.Ordinal))
+        using Stream stream = typeof(TemplateTools).Assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException(
-                $"No embedded resource ending in '{suffix}'. Ensure the template is included as an EmbeddedResource.");
-
-        using Stream stream = assembly.GetManifestResourceStream(resourceName)!;
+                $"No embedded resource '{resourceName}'. Ensure the template is included as an EmbeddedResource with that LogicalName.");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }

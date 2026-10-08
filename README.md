@@ -35,7 +35,7 @@ public static class HealthEndpoint
 }
 ```
 
-Grouped endpoints share one `RouteGroupBuilder`:
+Grouped endpoints share one `RouteGroupBuilder`, created and configured by the group's `MapEndpointGroup` function:
 
 ```csharp
 using Plugboard;
@@ -43,15 +43,15 @@ using Plugboard;
 [EndpointGroup]
 public static class TodoGroup
 {
-    public static void Configure(RouteGroupBuilder group) =>
-        group.WithTags("Todos").RequireAuthorization();
+    public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) =>
+        app.MapGroup("/todos").WithTags("Todos").RequireAuthorization();
 }
 
 [Endpoint(typeof(TodoGroup))]
 public static class GetTodoEndpoint
 {
     public static void MapEndpoint(IEndpointRouteBuilder app) =>
-        app.MapGet("/todos/{id}", (int id) => Results.Ok(id));
+        app.MapGet("/{id}", (int id) => Results.Ok(id));
 }
 ```
 
@@ -67,8 +67,8 @@ app.Run();
 Generated into your project's `RootNamespace` as `internal static` extensions on `IEndpointRouteBuilder`:
 
 - `RegisterEndpoints()` maps every `[Endpoint]` directly on the builder and calls every `Register{Group}()`.
-- `Register{Group}()` per `[EndpointGroup]`: creates the group, calls `Configure`, maps every
-  `[Endpoint(typeof(Group))]` on it.
+- `Register{Group}()` per `[EndpointGroup]`: calls `MapEndpointGroup`, maps every `[Endpoint(typeof(Group))]` on the
+  returned group.
 
 Classes may be `static`, or any non-abstract, non-generic class.
 
@@ -76,11 +76,11 @@ Classes may be `static`, or any non-abstract, non-generic class.
 
 | Id      | Source   | Message                                                                                                      |
 |---------|----------|--------------------------------------------------------------------------------------------------------------|
-| `PB001` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                  |
-| `PB002` | analyzer | `[EndpointGroup]` class must declare `public static void Configure(RouteGroupBuilder group)`                 |
-| `PB003` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                     |
-| `PB004` | analyzer | Endpoint or group type is generic or abstract                                                                |
-| `PB005` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide |
+| `PB101` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                  |
+| `PB102` | analyzer | `[EndpointGroup]` class must declare `public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app)` |
+| `PB103` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                     |
+| `PB104` | analyzer | Endpoint or group type is generic or abstract                                                                |
+| `PB105` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide |
 
 ## Build
 

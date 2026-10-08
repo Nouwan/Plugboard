@@ -26,7 +26,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="Templates\*.sbn-cs" />
-
+        <EmbeddedResource Include="EndpointRegistration.sbn-cs" LogicalName="EndpointRegistration.sbn-cs">
+          <DependentUpon>EndpointGenerator.cs</DependentUpon>
+        </EmbeddedResource>
     </ItemGroup>
 </Project>

@@ -43,7 +43,7 @@ public sealed class EndpointGenerator : IIncrementalGenerator
     private static bool IsValidEndpoint(INamedTypeSymbol type) => IsValidType(type) && HasMapEndpoint(type);
 
     private static bool IsValidGroup(INamedTypeSymbol type) =>
-        HasAttribute(type, EndpointGroupAttributeName) && IsValidType(type) && HasConfigure(type);
+        HasAttribute(type, EndpointGroupAttributeName) && IsValidType(type) && HasMapEndpointGroup(type);
 
     private static EndpointInfo? ToEndpoint(GeneratorAttributeSyntaxContext context, CancellationToken _)
     {

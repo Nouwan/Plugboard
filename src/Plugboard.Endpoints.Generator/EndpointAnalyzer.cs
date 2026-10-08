@@ -13,7 +13,7 @@ namespace Plugboard.Endpoints.Generator;
 public sealed class EndpointAnalyzer : DiagnosticAnalyzer
 {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        [MissingMapEndpoint, MissingConfigure, GroupNotMarked, UnusableType, DuplicateGroupName];
+        [MissingMapEndpoint, MissingMapEndpointGroup, GroupNotMarked, UnusableType, DuplicateGroupName];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -82,9 +82,9 @@ public sealed class EndpointAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(Diagnostic.Create(UnusableType, type.Location, type.Name));
         }
 
-        if (!HasConfigure(type))
+        if (!HasMapEndpointGroup(type))
         {
-            context.ReportDiagnostic(Diagnostic.Create(MissingConfigure, type.Location, type.Name));
+            context.ReportDiagnostic(Diagnostic.Create(MissingMapEndpointGroup, type.Location, type.Name));
         }
     }
 
