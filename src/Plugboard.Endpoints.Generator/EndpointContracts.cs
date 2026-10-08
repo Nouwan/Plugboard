@@ -2,10 +2,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Plugboard.Endpoints.Generator;
 
-/// <summary>
-/// Contract checks shared by the generator and the analyzer. The analyzer reports violations;
-/// the generator silently skips the same types so generated code never carries follow-up errors.
-/// </summary>
 internal static class EndpointContracts
 {
     public const string EndpointAttributeName = "Plugboard.EndpointAttribute";
@@ -13,16 +9,16 @@ internal static class EndpointContracts
     private const string RouteBuilderTypeName = "Microsoft.AspNetCore.Routing.IEndpointRouteBuilder";
     private const string RouteGroupBuilderTypeName = "Microsoft.AspNetCore.Routing.RouteGroupBuilder";
     private const string MapEndpointMethodName = "MapEndpoint";
-    private const string ConfigureMethodName = "Configure";
+    private const string MapEndpointGroupMethodName = "MapEndpointGroup";
 
     public static bool IsValidType(INamedTypeSymbol type) =>
         !type.IsGenericType && (type.IsStatic || !type.IsAbstract);
 
     public static bool HasMapEndpoint(INamedTypeSymbol type) =>
-        HasStaticVoidMethod(type, MapEndpointMethodName, RouteBuilderTypeName);
+        HasStaticMethod(type, MapEndpointMethodName, returnTypeName: null, RouteBuilderTypeName);
 
-    public static bool HasConfigure(INamedTypeSymbol type) =>
-        HasStaticVoidMethod(type, ConfigureMethodName, RouteGroupBuilderTypeName);
+    public static bool HasMapEndpointGroup(INamedTypeSymbol type) =>
+        HasStaticMethod(type, MapEndpointGroupMethodName, RouteGroupBuilderTypeName, RouteBuilderTypeName);
 
     public static bool HasAttribute(INamedTypeSymbol type, string attributeMetadataName) =>
         type.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == attributeMetadataName);
@@ -32,12 +28,13 @@ internal static class EndpointContracts
             ? group
             : null;
 
-    private static bool HasStaticVoidMethod(INamedTypeSymbol type, string name, string parameterTypeName) =>
+    private static bool HasStaticMethod(INamedTypeSymbol type, string name, string? returnTypeName,
+        string parameterTypeName) =>
         type.GetMembers(name).OfType<IMethodSymbol>().Any(method =>
             method.IsStatic &&
+            (returnTypeName is null ? method.ReturnsVoid : method.ReturnType.ToDisplayString() == returnTypeName) &&
             method is
             {
-                ReturnsVoid: true,
                 IsGenericMethod: false,
                 DeclaredAccessibility: Accessibility.Public or Accessibility.Internal,
                 Parameters: [{ Type: var parameterType }]
