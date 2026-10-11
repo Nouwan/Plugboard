@@ -168,7 +168,7 @@ internal sealed class EndpointAnalyzerTests
         var test = new CSharpAnalyzerTest<EndpointAnalyzer, DefaultVerifier>
         {
             TestCode = source,
-            ReferenceAssemblies = TestReferences.Net80AspNetCore
+            ReferenceAssemblies = TestReferences.Net100AspNetCore
         };
         test.TestState.AdditionalReferences.Add(typeof(EndpointAttribute).Assembly);
         return test.RunAsync();

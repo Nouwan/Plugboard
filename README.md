@@ -12,7 +12,7 @@ Just add the `[Endpoint]` attribute to a class and add a function with the signa
 
 ## Requirements
 
-- .net8.0 or higher
+- .NET 10 or higher
 
 ## Install
 

@@ -59,11 +59,14 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
-                    return app;
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        return app;
+                    }
                 }
             }
             """);
@@ -80,19 +83,22 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    app.RegisterTodoGroup();
-                    return app;
-                }
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        app.RegisterTodoGroup();
+                        return app;
+                    }
 
-                /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoGroup"/> and the endpoints declared for it.</summary>
-                internal static IEndpointRouteBuilder RegisterTodoGroup(this IEndpointRouteBuilder app)
-                {
-                    RouteGroupBuilder group = global::TestProject.Features.Todos.TodoGroup.MapEndpointGroup(app);
-                    global::TestProject.Features.Todos.GetTodoEndpoint.MapEndpoint(group);
-                    return app;
+                    /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoGroup"/> and the endpoints declared for it.</summary>
+                    internal IEndpointRouteBuilder RegisterTodoGroup()
+                    {
+                        RouteGroupBuilder group = global::TestProject.Features.Todos.TodoGroup.MapEndpointGroup(app);
+                        global::TestProject.Features.Todos.GetTodoEndpoint.MapEndpoint(group);
+                        return app;
+                    }
                 }
             }
             """);
@@ -125,18 +131,21 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    app.RegisterAdminGroup();
-                    return app;
-                }
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        app.RegisterAdminGroup();
+                        return app;
+                    }
 
-                /// <summary>Maps <see cref="global::TestProject.Features.Admin.AdminGroup"/> and the endpoints declared for it.</summary>
-                internal static IEndpointRouteBuilder RegisterAdminGroup(this IEndpointRouteBuilder app)
-                {
-                    RouteGroupBuilder group = global::TestProject.Features.Admin.AdminGroup.MapEndpointGroup(app);
-                    return app;
+                    /// <summary>Maps <see cref="global::TestProject.Features.Admin.AdminGroup"/> and the endpoints declared for it.</summary>
+                    internal IEndpointRouteBuilder RegisterAdminGroup()
+                    {
+                        RouteGroupBuilder group = global::TestProject.Features.Admin.AdminGroup.MapEndpointGroup(app);
+                        return app;
+                    }
                 }
             }
             """);
@@ -154,20 +163,23 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
-                    app.RegisterTodoGroup();
-                    return app;
-                }
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        app.RegisterTodoGroup();
+                        return app;
+                    }
 
-                /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoGroup"/> and the endpoints declared for it.</summary>
-                internal static IEndpointRouteBuilder RegisterTodoGroup(this IEndpointRouteBuilder app)
-                {
-                    RouteGroupBuilder group = global::TestProject.Features.Todos.TodoGroup.MapEndpointGroup(app);
-                    global::TestProject.Features.Todos.GetTodoEndpoint.MapEndpoint(group);
-                    return app;
+                    /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoGroup"/> and the endpoints declared for it.</summary>
+                    internal IEndpointRouteBuilder RegisterTodoGroup()
+                    {
+                        RouteGroupBuilder group = global::TestProject.Features.Todos.TodoGroup.MapEndpointGroup(app);
+                        global::TestProject.Features.Todos.GetTodoEndpoint.MapEndpoint(group);
+                        return app;
+                    }
                 }
             }
             """);
@@ -206,12 +218,15 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    global::TestProject.Features.Misc.RecordEndpoint.MapEndpoint(app);
-                    global::TestProject.Features.Misc.StructEndpoint.MapEndpoint(app);
-                    return app;
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        global::TestProject.Features.Misc.RecordEndpoint.MapEndpoint(app);
+                        global::TestProject.Features.Misc.StructEndpoint.MapEndpoint(app);
+                        return app;
+                    }
                 }
             }
             """);
@@ -245,11 +260,14 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
-                    return app;
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        return app;
+                    }
                 }
             }
             """);
@@ -309,11 +327,14 @@ internal sealed class EndpointGeneratorTests
 
             internal static class EndpointRegistrationExtensions
             {
-                /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                internal static IEndpointRouteBuilder RegisterEndpoints(this IEndpointRouteBuilder app)
+                extension(IEndpointRouteBuilder app)
                 {
-                    global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
-                    return app;
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    {
+                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        return app;
+                    }
                 }
             }
             """, rootNamespace: "My.Custom.Root");
@@ -324,7 +345,7 @@ internal sealed class EndpointGeneratorTests
         var test = new CSharpSourceGeneratorTest<EndpointGenerator, DefaultVerifier>
         {
             TestCode = source,
-            ReferenceAssemblies = TestReferences.Net80AspNetCore
+            ReferenceAssemblies = TestReferences.Net100AspNetCore
         };
         test.TestState.AdditionalReferences.Add(typeof(EndpointAttribute).Assembly);
 
