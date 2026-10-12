@@ -1,5 +1,8 @@
 # Plugboard
 
+[!WARNING]
+Plugboard is pre-1.0. The public API may change in any minor release until 1.0.0.
+
 Build your ASP.NET minimal API using one class per endpoint and leave the wiring up to us!
 
 Structure your code however you want: standalone endpoints, groups, one project or several. Endpoints use the minimal
