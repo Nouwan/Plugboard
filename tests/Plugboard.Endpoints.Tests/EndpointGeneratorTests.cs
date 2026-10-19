@@ -15,7 +15,7 @@ internal sealed class EndpointGeneratorTests
 
         namespace TestProject.Features.Health
         {
-            using Plugboard;
+            using Plugboard.Endpoints;
             using Microsoft.AspNetCore.Routing;
 
             [Endpoint]
@@ -30,7 +30,7 @@ internal sealed class EndpointGeneratorTests
 
         namespace TestProject.Features.Todos
         {
-            using Plugboard;
+            using Plugboard.Endpoints;
             using Microsoft.AspNetCore.Routing;
 
             [EndpointGroup]
@@ -110,7 +110,7 @@ internal sealed class EndpointGeneratorTests
 
             namespace TestProject.Features.Admin
             {
-                using Plugboard;
+                using Plugboard.Endpoints;
                 using Microsoft.AspNetCore.Routing;
 
                 [EndpointGroup]
@@ -191,7 +191,7 @@ internal sealed class EndpointGeneratorTests
 
             namespace TestProject.Features.Misc
             {
-                using Plugboard;
+                using Plugboard.Endpoints;
                 using Microsoft.AspNetCore.Routing;
 
                 [Endpoint]
@@ -239,7 +239,7 @@ internal sealed class EndpointGeneratorTests
 
             namespace TestProject.Features.Other
             {
-                using Plugboard;
+                using Plugboard.Endpoints;
                 using Microsoft.AspNetCore.Routing;
 
                 [EndpointGroup]
@@ -278,7 +278,7 @@ internal sealed class EndpointGeneratorTests
 
         namespace TestProject
         {
-            using Plugboard;
+            using Plugboard.Endpoints;
 
             [Endpoint]
             public static class BrokenEndpoint { }
@@ -290,7 +290,7 @@ internal sealed class EndpointGeneratorTests
 
         namespace TestProject
         {
-            using Plugboard;
+            using Plugboard.Endpoints;
             using Microsoft.AspNetCore.Routing;
 
             public static class NotAGroup

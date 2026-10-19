@@ -1,4 +1,4 @@
-namespace Plugboard;
+namespace Plugboard.Endpoints;
 
 /// <summary>
 /// Marks a type that maps an endpoint. The class must declare
@@ -17,6 +17,6 @@ public sealed class EndpointAttribute : Attribute
     /// <param name="group">A type registering a <see cref="EndpointGroupAttribute"/>.</param>
     public EndpointAttribute(Type group) => Group = group;
 
-    /// <summary>The group this endpoint belongs to</summary>
+    /// <summary>The group the endpoint maps onto belongs to</summary>
     public Type? Group { get; }
 }

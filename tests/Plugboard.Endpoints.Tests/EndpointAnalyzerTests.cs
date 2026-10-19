@@ -11,7 +11,7 @@ internal sealed class EndpointAnalyzerTests
 {
     [Test]
     public Task Analyze_WithValidEndpointAndGroup_ShouldReportNothing() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
@@ -35,7 +35,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithEndpointMissingMapEndpoint_ShouldReportPB101() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
 
         [Endpoint]
         public static class {|PB101:BrokenEndpoint|} { }
@@ -43,7 +43,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithInstanceMapEndpoint_ShouldReportPB101() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
@@ -55,7 +55,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithWrongParameterType_ShouldReportPB101() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
@@ -67,7 +67,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithGroupMissingMapEndpointGroup_ShouldReportPB102() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
 
         [EndpointGroup]
         public static class {|PB102:TodoGroup|} { }
@@ -75,7 +75,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithVoidMapEndpointGroup_ShouldReportPB102() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
@@ -87,7 +87,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithLegacyConfigure_ShouldReportPB102() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
@@ -99,7 +99,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithUnmarkedGroupType_ShouldReportPB103() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         public static class NotAGroup
@@ -116,7 +116,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithGenericEndpoint_ShouldReportPB104() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [Endpoint]
@@ -128,7 +128,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithAbstractGroup_ShouldReportPB104() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
@@ -140,7 +140,7 @@ internal sealed class EndpointAnalyzerTests
 
     [Test]
     public Task Analyze_WithDuplicateGroupNames_ShouldReportPB105() => Analyze("""
-        using Plugboard;
+        using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         namespace Features.Todos

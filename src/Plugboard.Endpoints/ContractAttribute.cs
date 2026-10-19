@@ -1,6 +1,6 @@
 using JetBrains.Annotations;
 
-namespace Plugboard;
+namespace Plugboard.Endpoints;
 
 /// <summary>
 /// Marks a type that is part of the contract to the outside world.

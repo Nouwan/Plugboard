@@ -28,7 +28,7 @@ dotnet add package Plugboard.Endpoints
 Standalone endpoint:
 
 ```csharp
-using Plugboard;
+using Plugboard.Endpoints;
 
 [Endpoint]
 public static class HealthEndpoint
@@ -41,7 +41,7 @@ public static class HealthEndpoint
 Grouped endpoints share one `RouteGroupBuilder`, created and configured by the group's `MapEndpointGroup` function:
 
 ```csharp
-using Plugboard;
+using Plugboard.Endpoints;
 
 [EndpointGroup]
 public static class TodoGroup

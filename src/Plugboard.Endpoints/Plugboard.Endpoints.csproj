@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <RootNamespace>Plugboard</RootNamespace>
+        <RootNamespace>Plugboard.Endpoints</RootNamespace>
         <PackageId>Plugboard.Endpoints</PackageId>
         <Description>Source-generated endpoint registration for ASP.NET Core minimal APIs</Description>
         <PackageTags>aspnetcore;minimal-api;endpoints;source-generator;analyzer</PackageTags>
