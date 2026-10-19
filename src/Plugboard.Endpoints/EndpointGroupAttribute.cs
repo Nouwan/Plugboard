@@ -1,4 +1,4 @@
-namespace Plugboard;
+namespace Plugboard.Endpoints;
 
 /// <summary>
 /// Marks a type as a endpoint group. The type must declare

@@ -4,8 +4,8 @@ namespace Plugboard.Endpoints.Generator;
 
 internal static class EndpointContracts
 {
-    public const string EndpointAttributeName = "Plugboard.EndpointAttribute";
-    public const string EndpointGroupAttributeName = "Plugboard.EndpointGroupAttribute";
+    public const string EndpointAttributeName = "Plugboard.Endpoints.EndpointAttribute";
+    public const string EndpointGroupAttributeName = "Plugboard.Endpoints.EndpointGroupAttribute";
     private const string RouteBuilderTypeName = "Microsoft.AspNetCore.Routing.IEndpointRouteBuilder";
     private const string RouteGroupBuilderTypeName = "Microsoft.AspNetCore.Routing.RouteGroupBuilder";
     private const string MapEndpointMethodName = "MapEndpoint";
