@@ -18,10 +18,10 @@ internal sealed class EndpointGeneratorTests
             using Plugboard.Endpoints;
             using Microsoft.AspNetCore.Routing;
 
-            [Endpoint]
             public static class HealthEndpoint
             {
-                public static void MapEndpoint(IEndpointRouteBuilder app) { }
+                [MapEndpoint]
+                public static void Map(IEndpointRouteBuilder app) { }
             }
         }
         """;
@@ -36,13 +36,13 @@ internal sealed class EndpointGeneratorTests
             [EndpointGroup]
             public static class TodoGroup
             {
-                public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+                public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
             }
 
-            [Endpoint(typeof(TodoGroup))]
             public sealed class GetTodoEndpoint
             {
-                public static void MapEndpoint(IEndpointRouteBuilder app) { }
+                [MapEndpoint(typeof(TodoGroup))]
+                public static void Map(IEndpointRouteBuilder app) { }
             }
         }
         """;
@@ -62,9 +62,9 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        global::TestProject.Features.Health.HealthEndpoint.Map(app);
                         return app;
                     }
                 }
@@ -86,17 +86,17 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        app.RegisterTodoGroup();
+                        app.MapTodoGroup();
                         return app;
                     }
 
                     /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoGroup"/> and the endpoints declared for it.</summary>
-                    internal IEndpointRouteBuilder RegisterTodoGroup()
+                    internal IEndpointRouteBuilder MapTodoGroup()
                     {
-                        RouteGroupBuilder group = global::TestProject.Features.Todos.TodoGroup.MapEndpointGroup(app);
-                        global::TestProject.Features.Todos.GetTodoEndpoint.MapEndpoint(group);
+                        IEndpointRouteBuilder group = global::TestProject.Features.Todos.TodoGroup.CreateGroup(app);
+                        global::TestProject.Features.Todos.GetTodoEndpoint.Map(group);
                         return app;
                     }
                 }
@@ -116,7 +116,7 @@ internal sealed class EndpointGeneratorTests
                 [EndpointGroup]
                 public static class AdminGroup
                 {
-                    public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+                    public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
                 }
             }
             """;
@@ -134,16 +134,16 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        app.RegisterAdminGroup();
+                        app.MapAdminGroup();
                         return app;
                     }
 
                     /// <summary>Maps <see cref="global::TestProject.Features.Admin.AdminGroup"/> and the endpoints declared for it.</summary>
-                    internal IEndpointRouteBuilder RegisterAdminGroup()
+                    internal IEndpointRouteBuilder MapAdminGroup()
                     {
-                        RouteGroupBuilder group = global::TestProject.Features.Admin.AdminGroup.MapEndpointGroup(app);
+                        IEndpointRouteBuilder group = global::TestProject.Features.Admin.AdminGroup.CreateGroup(app);
                         return app;
                     }
                 }
@@ -166,18 +166,18 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
-                        app.RegisterTodoGroup();
+                        global::TestProject.Features.Health.HealthEndpoint.Map(app);
+                        app.MapTodoGroup();
                         return app;
                     }
 
                     /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoGroup"/> and the endpoints declared for it.</summary>
-                    internal IEndpointRouteBuilder RegisterTodoGroup()
+                    internal IEndpointRouteBuilder MapTodoGroup()
                     {
-                        RouteGroupBuilder group = global::TestProject.Features.Todos.TodoGroup.MapEndpointGroup(app);
-                        global::TestProject.Features.Todos.GetTodoEndpoint.MapEndpoint(group);
+                        IEndpointRouteBuilder group = global::TestProject.Features.Todos.TodoGroup.CreateGroup(app);
+                        global::TestProject.Features.Todos.GetTodoEndpoint.Map(group);
                         return app;
                     }
                 }
@@ -194,16 +194,16 @@ internal sealed class EndpointGeneratorTests
                 using Plugboard.Endpoints;
                 using Microsoft.AspNetCore.Routing;
 
-                [Endpoint]
                 public sealed record RecordEndpoint
                 {
-                    public static void MapEndpoint(IEndpointRouteBuilder app) { }
+                    [MapEndpoint]
+                    public static void Map(IEndpointRouteBuilder app) { }
                 }
 
-                [Endpoint]
                 public readonly struct StructEndpoint
                 {
-                    public static void MapEndpoint(IEndpointRouteBuilder app) { }
+                    [MapEndpoint]
+                    public static void Map(IEndpointRouteBuilder app) { }
                 }
             }
             """;
@@ -221,10 +221,152 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        global::TestProject.Features.Misc.RecordEndpoint.MapEndpoint(app);
-                        global::TestProject.Features.Misc.StructEndpoint.MapEndpoint(app);
+                        global::TestProject.Features.Misc.RecordEndpoint.Map(app);
+                        global::TestProject.Features.Misc.StructEndpoint.Map(app);
+                        return app;
+                    }
+                }
+            }
+            """);
+    }
+
+    [Test]
+    public Task Generate_WithMultipleMapEndpointsInOneType_ShouldEmitEachInOrdinalOrder()
+    {
+        const string source = """
+
+            namespace TestProject.Features.Todos
+            {
+                using Plugboard.Endpoints;
+                using Microsoft.AspNetCore.Routing;
+
+                public static class TodoEndpoints
+                {
+                    [MapEndpoint]
+                    internal static void MapList(IEndpointRouteBuilder app) { }
+
+                    [MapEndpoint]
+                    public static void MapCreate(IEndpointRouteBuilder app) { }
+                }
+            }
+            """;
+
+        return Generate(source, """
+            // <auto-generated/>
+            #nullable enable
+
+            using Microsoft.AspNetCore.Routing;
+
+            namespace TestAssembly;
+
+            internal static class EndpointRegistrationExtensions
+            {
+                extension(IEndpointRouteBuilder app)
+                {
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder MapEndpoints()
+                    {
+                        global::TestProject.Features.Todos.TodoEndpoints.MapCreate(app);
+                        global::TestProject.Features.Todos.TodoEndpoints.MapList(app);
+                        return app;
+                    }
+                }
+            }
+            """);
+    }
+
+    [Test]
+    public Task Generate_WithGroupMappingItsOwnEndpoints_ShouldEmitGroupRegistration()
+    {
+        const string source = """
+
+            namespace TestProject.Features.Todos
+            {
+                using Plugboard.Endpoints;
+                using Microsoft.AspNetCore.Routing;
+
+                [EndpointGroup]
+                public static class TodoModule
+                {
+                    public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
+
+                    [MapEndpoint(typeof(TodoModule))]
+                    public static void MapGet(IEndpointRouteBuilder group) { }
+
+                    [MapEndpoint]
+                    public static void MapHealth(IEndpointRouteBuilder app) { }
+                }
+            }
+            """;
+
+        return Generate(source, """
+            // <auto-generated/>
+            #nullable enable
+
+            using Microsoft.AspNetCore.Routing;
+
+            namespace TestAssembly;
+
+            internal static class EndpointRegistrationExtensions
+            {
+                extension(IEndpointRouteBuilder app)
+                {
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder MapEndpoints()
+                    {
+                        global::TestProject.Features.Todos.TodoModule.MapHealth(app);
+                        app.MapTodoModule();
+                        return app;
+                    }
+
+                    /// <summary>Maps <see cref="global::TestProject.Features.Todos.TodoModule"/> and the endpoints declared for it.</summary>
+                    internal IEndpointRouteBuilder MapTodoModule()
+                    {
+                        IEndpointRouteBuilder group = global::TestProject.Features.Todos.TodoModule.CreateGroup(app);
+                        global::TestProject.Features.Todos.TodoModule.MapGet(group);
+                        return app;
+                    }
+                }
+            }
+            """);
+    }
+
+    [Test]
+    public Task Generate_WithMapEndpointInAbstractType_ShouldEmitRegistration()
+    {
+        const string source = """
+
+            namespace TestProject.Features.Misc
+            {
+                using Plugboard.Endpoints;
+                using Microsoft.AspNetCore.Routing;
+
+                public abstract class BaseEndpoint
+                {
+                    [MapEndpoint]
+                    public static void Map(IEndpointRouteBuilder app) { }
+                }
+            }
+            """;
+
+        return Generate(source, """
+            // <auto-generated/>
+            #nullable enable
+
+            using Microsoft.AspNetCore.Routing;
+
+            namespace TestAssembly;
+
+            internal static class EndpointRegistrationExtensions
+            {
+                extension(IEndpointRouteBuilder app)
+                {
+                    /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
+                    internal IEndpointRouteBuilder MapEndpoints()
+                    {
+                        global::TestProject.Features.Misc.BaseEndpoint.Map(app);
                         return app;
                     }
                 }
@@ -245,7 +387,7 @@ internal sealed class EndpointGeneratorTests
                 [EndpointGroup]
                 public static class TodoGroup
                 {
-                    public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+                    public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
                 }
             }
             """ + HealthEndpoint;
@@ -263,9 +405,9 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        global::TestProject.Features.Health.HealthEndpoint.Map(app);
                         return app;
                     }
                 }
@@ -274,14 +416,37 @@ internal sealed class EndpointGeneratorTests
     }
 
     [Test]
-    public Task Generate_WithEndpointMissingMapEndpoint_ShouldEmitNothing() => Generate("""
+    public Task Generate_WithInvalidMapEndpointSignature_ShouldEmitNothing() => Generate("""
 
         namespace TestProject
         {
             using Plugboard.Endpoints;
+            using Microsoft.AspNetCore.Routing;
 
-            [Endpoint]
-            public static class BrokenEndpoint { }
+            public static class BrokenEndpoint
+            {
+                [MapEndpoint]
+                public static void Map(RouteGroupBuilder app) { }
+            }
+        }
+        """);
+
+    [Test]
+    public Task Generate_WithMapEndpointInGenericType_ShouldEmitNothing() => Generate("""
+
+        namespace TestProject
+        {
+            using Plugboard.Endpoints;
+            using Microsoft.AspNetCore.Routing;
+
+            public static class Outer<T>
+            {
+                public static class Inner
+                {
+                    [MapEndpoint]
+                    public static void Map(IEndpointRouteBuilder app) { }
+                }
+            }
         }
         """);
 
@@ -295,13 +460,13 @@ internal sealed class EndpointGeneratorTests
 
             public static class NotAGroup
             {
-                public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+                public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
             }
 
-            [Endpoint(typeof(NotAGroup))]
             public static class OrphanEndpoint
             {
-                public static void MapEndpoint(IEndpointRouteBuilder app) { }
+                [MapEndpoint(typeof(NotAGroup))]
+                public static void Map(IEndpointRouteBuilder app) { }
             }
         }
         """);
@@ -330,9 +495,9 @@ internal sealed class EndpointGeneratorTests
                 extension(IEndpointRouteBuilder app)
                 {
                     /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-                    internal IEndpointRouteBuilder RegisterEndpoints()
+                    internal IEndpointRouteBuilder MapEndpoints()
                     {
-                        global::TestProject.Features.Health.HealthEndpoint.MapEndpoint(app);
+                        global::TestProject.Features.Health.HealthEndpoint.Map(app);
                         return app;
                     }
                 }
@@ -347,7 +512,7 @@ internal sealed class EndpointGeneratorTests
             TestCode = source,
             ReferenceAssemblies = TestReferences.Net100AspNetCore
         };
-        test.TestState.AdditionalReferences.Add(typeof(EndpointAttribute).Assembly);
+        test.TestState.AdditionalReferences.Add(typeof(MapEndpointAttribute).Assembly);
 
         // build_property.* values reach the generator through a global analyzer config, exactly as MSBuild passes them.
         test.TestState.AnalyzerConfigFiles.Add(("/.globalconfig", $"""
@@ -355,7 +520,7 @@ internal sealed class EndpointGeneratorTests
             build_property.RootNamespace = {rootNamespace}
             """));
 
-        // No expected text means the generator must emit nothing; the framework asserts the exact set of generated files.
+        // No expected text means the generator must emit nothing
         if (expected is not null)
         {
             test.TestState.GeneratedSources.Add((typeof(EndpointGenerator), "EndpointRegistration.g.cs",

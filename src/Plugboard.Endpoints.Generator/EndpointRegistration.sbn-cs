@@ -10,24 +10,24 @@ internal static class EndpointRegistrationExtensions
     extension(IEndpointRouteBuilder app)
     {
         /// <summary>Maps every endpoint and endpoint group declared in this assembly.</summary>
-        internal IEndpointRouteBuilder RegisterEndpoints()
+        internal IEndpointRouteBuilder MapEndpoints()
         {
             {{- for ep in endpoints }}
-            {{ ep }}.MapEndpoint(app);
+            {{ ep }}(app);
             {{- end }}
             {{- for group in groups }}
-            app.Register{{ group.name }}();
+            app.Map{{ group.name }}();
             {{- end }}
             return app;
         }
         {{~ for group in groups ~}}
 
-        /// <summary>Maps <see cref="{{ group.fqn }}"/> and the endpoints declared for it.</summary>
-        internal IEndpointRouteBuilder Register{{ group.name }}()
+        /// <summary>Maps <see cref="{{ group.type }}"/> and the endpoints declared for it.</summary>
+        internal IEndpointRouteBuilder Map{{ group.name }}()
         {
-            RouteGroupBuilder group = {{ group.fqn }}.MapEndpointGroup(app);
+            IEndpointRouteBuilder group = {{ group.type }}.CreateGroup(app);
             {{- for ep in group.endpoints }}
-            {{ ep }}.MapEndpoint(group);
+            {{ ep }}(group);
             {{- end }}
             return app;
         }
