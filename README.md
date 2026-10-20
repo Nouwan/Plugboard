@@ -1,17 +1,23 @@
 # Plugboard
-
-[!WARNING]
 Plugboard is pre-1.0. The public API may change in any minor release until 1.0.0.
 
-Build your ASP.NET minimal API using one class per endpoint and leave the wiring up to us!
+Plugboard takes care of the wiring of services, endpoints and much more for you, 
+this allows you to focus on implementing code that actually matters.
 
-Structure your code however you want: standalone endpoints, groups, one project or several. Endpoints use the minimal
-API methods on `IEndpointRouteBuilder` giving you the flexibility to use the existing API surface and community
-extensions.
+We expose as much of the original api as feasible while only providing you with a way to connect the bits together. 
 
-Just add the `[Endpoint]` attribute to a class and add a function with the signature:
-`public static void MapEndpoint(IEndpointRouteBuilder app)` and all endpoints will be registered by simply calling
-`app.RegisterEndpoints(); ` in your `program.cs`
+Plugboard is made up of the following packages:
+
+| Package               | Description                              |
+|-----------------------|------------------------------------------|
+| `Plugboard.Endpoints` | Easily map asp.net minimal api endpoints |
+
+# Endpoints
+Plugboard.Endpoints allows you to set up a asp.net minimal api endpoint in the location that makes sense to you.
+Just add the MapEndpoint attribute and we will do the wiring for you
+
+Just add the `[MapEndpoint]` attribute to a `static void` method that takes an `IEndpointRouteBuilder`, and all
+endpoints will be mapped by simply calling `app.MapEndpoints();` in your `program.cs`
 
 ## Requirements
 
@@ -30,15 +36,18 @@ Standalone endpoint:
 ```csharp
 using Plugboard.Endpoints;
 
-[Endpoint]
 public static class HealthEndpoint
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app) =>
+    [MapEndpoint]
+    public static void Map(IEndpointRouteBuilder app) =>
         app.MapGet("/health", () => Results.Ok());
 }
 ```
 
-Grouped endpoints share one `RouteGroupBuilder`, created and configured by the group's `MapEndpointGroup` function:
+The method name is free. It must be `static void`, `public` or `internal`, non-generic, and take a single
+`IEndpointRouteBuilder` parameter. A class may hold any number of `[MapEndpoint]` methods.
+
+Grouped endpoints share one `RouteGroupBuilder`, created and configured by the group's `CreateGroup` function:
 
 ```csharp
 using Plugboard.Endpoints;
@@ -46,34 +55,55 @@ using Plugboard.Endpoints;
 [EndpointGroup]
 public static class TodoGroup
 {
-    public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) =>
+    public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) =>
         app.MapGroup("/todos").WithTags("Todos").RequireAuthorization();
 }
 
-[Endpoint(typeof(TodoGroup))]
 public static class GetTodoEndpoint
 {
-    public static void MapEndpoint(IEndpointRouteBuilder app) =>
-        app.MapGet("/{id}", (int id) => Results.Ok(id));
+    [MapEndpoint(typeof(TodoGroup))]
+    public static void Map(IEndpointRouteBuilder group) =>
+        group.MapGet("/{id}", (int id) => Results.Ok(id));
 }
 ```
 
-Register in `Program.cs`:
+A group may map its own endpoints too, so a feature can live in one class:
+
+```csharp
+[EndpointGroup]
+public static class TodoModule
+{
+    public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) =>
+        app.MapGroup("/todos").WithTags("Todos");
+
+    [MapEndpoint(typeof(TodoModule))]
+    public static void MapGet(IEndpointRouteBuilder group) =>
+        group.MapGet("/{id}", (int id) => Results.Ok(id));
+
+    [MapEndpoint(typeof(TodoModule))]
+    public static void MapList(IEndpointRouteBuilder group) =>
+        group.MapGet("/", () => Results.Ok());
+}
+```
+
+Map in `Program.cs`:
 
 ```csharp
 var app = builder.Build();
-app.RegisterEndpoints();   // everything
-app.RegisterTodoGroup();   // or one group at a time
+app.MapEndpoints();   // map all endpoints in the assembly
+app.MapTodoGroup();   // map a specific group of endpoints in the assembly
 app.Run();
 ```
 
 Generated into your project's `RootNamespace` as `internal static` extensions on `IEndpointRouteBuilder`:
 
-- `RegisterEndpoints()` maps every `[Endpoint]` directly on the builder and calls every `Register{Group}()`.
-- `Register{Group}()` per `[EndpointGroup]`: calls `MapEndpointGroup`, maps every `[Endpoint(typeof(Group))]` on the
-  returned group.
+- `MapEndpoints()` calls every `[MapEndpoint]` method directly with the builder and calls every
+  `Map{Group}()`.
+- `Map{Group}()` per `[EndpointGroup]`: calls `CreateGroup`, then calls every
+  `[MapEndpoint(typeof(Group))]` method with the returned group.
 
-Classes may be `static`, or any non-abstract, non-generic class.
+`[MapEndpoint]` methods and `[EndpointGroup]` types may live in any class, record or struct, as long as neither it
+nor a type it is nested in is generic.
 
 ### Contracts
 
@@ -90,13 +120,13 @@ unused. `[Contract]` carries `[MeansImplicitUse]` for the type and all its membe
 
 ## Diagnostics
 
-| Id      | Source   | Message                                                                                                            |
-|---------|----------|--------------------------------------------------------------------------------------------------------------------|
-| `PB101` | analyzer | `[Endpoint]` class must declare `public static void MapEndpoint(IEndpointRouteBuilder app)`                        |
-| `PB102` | analyzer | `[EndpointGroup]` class must declare `public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app)` |
-| `PB103` | analyzer | Type passed to `[Endpoint(typeof(...))]` is not marked `[EndpointGroup]`                                           |
-| `PB104` | analyzer | Endpoint or group type is generic or abstract                                                                      |
-| `PB105` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Register{Group}()` would collide       |
+| Id      | Source   | Message                                                                                                       |
+|---------|----------|---------------------------------------------------------------------------------------------------------------|
+| `PB101` | analyzer | `[MapEndpoint]` method is not a `public`/`internal`, non-generic `static void` taking `IEndpointRouteBuilder` |
+| `PB102` | analyzer | `[EndpointGroup]` class must declare `public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app)` |
+| `PB103` | analyzer | Type passed to `[MapEndpoint(typeof(...))]` is not marked `[EndpointGroup]`                                   |
+| `PB104` | analyzer | `[MapEndpoint]` method or `[EndpointGroup]` type is generic or declared in a generic type                     |
+| `PB105` | analyzer | Two endpoint groups share the same (simple) name inside the same assembly; `Map{Group}()` would collide       |
 
 ## Build
 

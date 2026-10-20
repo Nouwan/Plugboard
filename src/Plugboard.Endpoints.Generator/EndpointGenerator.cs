@@ -1,8 +1,7 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using Plugboard.Endpoints.Generator.Utils;
-using static Plugboard.Endpoints.Generator.EndpointContracts;
 
 namespace Plugboard.Endpoints.Generator;
 
@@ -11,106 +10,115 @@ public sealed class EndpointGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        IncrementalValueProvider<EquatableArray<EndpointInfo>> endpoints = context.SyntaxProvider
-            .ForAttributeWithMetadataName(EndpointAttributeName, IsTypeDeclaration, ToEndpoint)
-            .WhereNotNull()
-            .Collect()
-            .Select(static (items, _) => items.AsEquatableArray());
+        IncrementalValuesProvider<EndpointInfo> endpoints = context.SyntaxProvider
+            .ForAttributeWithMetadataName(WellKnownTypes.MapEndpointAttributeName,
+                static (node, _) => node is MethodDeclarationSyntax,
+                ToEndpoint)
+            .WhereNotNull();
 
-        IncrementalValueProvider<EquatableArray<GroupInfo>> groups = context.SyntaxProvider
-            .ForAttributeWithMetadataName(EndpointGroupAttributeName, IsTypeDeclaration, ToGroup)
-            .WhereNotNull()
-            .Collect()
-            .Select(static (items, _) => items.AsEquatableArray());
+        IncrementalValuesProvider<GroupInfo> groupDeclarations = context.SyntaxProvider
+            .ForAttributeWithMetadataName(WellKnownTypes.EndpointGroupAttributeName,
+                static (node, _) => node is TypeDeclarationSyntax,
+                ToGroup)
+            .WhereNotNull();
 
-        IncrementalValueProvider<Model> model = endpoints
-            .Combine(groups)
+        IncrementalValueProvider<Model> model = endpoints.Collect()
+            .Combine(groupDeclarations.Collect())
             .Combine(context.GetRootNamespace())
-            .Select(BuildModel);
+            .Select(ToModel);
 
         context.RegisterSourceOutput(model, Emit);
     }
 
-    private static Model BuildModel(
-        ((EquatableArray<EndpointInfo> endpoints, EquatableArray<GroupInfo> groups) source, string rootNameSpace) input,
-        CancellationToken _)
-    {
-        return new Model(input.source.endpoints, input.source.groups, input.rootNameSpace);
-    }
-
-    private static bool IsTypeDeclaration(SyntaxNode node, CancellationToken _) => node is TypeDeclarationSyntax;
-
-    private static bool IsValidEndpoint(INamedTypeSymbol type) => IsValidType(type) && HasMapEndpoint(type);
-
-    private static bool IsValidGroup(INamedTypeSymbol type) =>
-        HasAttribute(type, EndpointGroupAttributeName) && IsValidType(type) && HasMapEndpointGroup(type);
-
     private static EndpointInfo? ToEndpoint(GeneratorAttributeSyntaxContext context, CancellationToken _)
     {
-        if (context.TargetSymbol is not INamedTypeSymbol type || !IsValidEndpoint(type))
+        var method = (IMethodSymbol)context.TargetSymbol;
+        AttributeData mapEndpointAttribute = context.Attributes[0];
+        var types = WellKnownTypes.FindWellKnownTypes(context.SemanticModel.Compilation);
+
+        if (types is null || !MapEndpoint.IsValid(method, types))
         {
             return null;
         }
 
-        INamedTypeSymbol? group = GetGroupType(context.Attributes[0]);
+        INamedTypeSymbol? group = MapEndpoint.GroupOf(mapEndpointAttribute);
 
-        if (group is not null && !IsValidGroup(group))
+        if (group is not null && !EndpointGroup.IsValid(group, types))
         {
             return null;
         }
 
-        return new EndpointInfo(type.FullyQualifiedName, group?.FullyQualifiedName);
+        return new EndpointInfo(method.FullyQualifiedName, group?.FullyQualifiedName);
     }
 
-    private static GroupInfo? ToGroup(GeneratorAttributeSyntaxContext context, CancellationToken _) =>
-        context.TargetSymbol is INamedTypeSymbol type && IsValidGroup(type)
-            ? new GroupInfo(type.FullyQualifiedName, type.Name)
-            : null;
+    private static GroupInfo? ToGroup(GeneratorAttributeSyntaxContext context, CancellationToken _)
+    {
+        var type = (INamedTypeSymbol)context.TargetSymbol;
+        var types = WellKnownTypes.FindWellKnownTypes(context.SemanticModel.Compilation);
+
+        if (types is null || !EndpointGroup.IsValid(type, types))
+        {
+            return null;
+        }
+
+        return new GroupInfo(type.FullyQualifiedName, type.Name);
+    }
+
+    private static Model ToModel(
+        ((ImmutableArray<EndpointInfo> endpoints, ImmutableArray<GroupInfo> groupDeclarations) found, string rootNamespace) source,
+        CancellationToken _)
+    {
+        return new Model(
+            source.found.endpoints.AsEquatableArray(),
+            source.found.groupDeclarations.AsEquatableArray(),
+            source.rootNamespace);
+    }
 
     private static void Emit(SourceProductionContext context, Model model)
     {
-        (EquatableArray<EndpointInfo> endpoints, EquatableArray<GroupInfo> groups, string rootNamespace) = model;
+        List<string> standaloneEndpoints = StandaloneEndpoints(model.Endpoints);
 
-        var uniqueGroups = groups.Distinct().OrderBy(static g => g.Fqn, StringComparer.Ordinal).ToList();
-        HashSet<string> collidingNames = CollidingNames(uniqueGroups);
-
-        var validGroups = uniqueGroups
-            .Where(g => !collidingNames.Contains(g.Name))
-            .Select(g => new { g.Fqn, g.Name, Endpoints = EndpointsOf(endpoints, g.Fqn) })
+        var groups = GroupsWithUniqueNames(model.GroupDeclarations)
+            .Select(group => new TemplateGroup(group.Type, group.Name, EndpointsInGroup(group.Type, model.Endpoints)))
             .ToList();
 
-        List<string> standalone = EndpointsOf(endpoints, groupFqn: null);
-
-        if ((standalone.Count == 0) && (validGroups.Count == 0))
+        if ((standaloneEndpoints.Count == 0) && (groups.Count == 0))
         {
             return;
         }
 
-        SourceText rendered = TemplateTools.RenderTemplate("EndpointRegistration",
-            new { RootNamespace = rootNamespace, Endpoints = standalone, Groups = validGroups });
-        context.AddSource("EndpointRegistration.g.cs", rendered);
+        var template = new TemplateModel(model.RootNamespace, standaloneEndpoints, groups);
+        context.AddSource("EndpointRegistration.g.cs", TemplateTools.RenderTemplate("EndpointRegistration", template));
     }
 
-    private static HashSet<string> CollidingNames(List<GroupInfo> groups) =>
-        new(groups.GroupBy(static g => g.Name, StringComparer.Ordinal)
-                .Where(static g => g.Count() > 1)
-                .Select(static g => g.Key),
-            StringComparer.Ordinal);
-
-    private static List<string> EndpointsOf(EquatableArray<EndpointInfo> endpoints, string? groupFqn) =>
+    private static List<string> StandaloneEndpoints(IEnumerable<EndpointInfo> endpoints) =>
         endpoints
-            .Where(e => e.GroupFqn == groupFqn)
-            .Select(static e => e.Fqn)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static e => e, StringComparer.Ordinal)
+            .Where(static endpoint => endpoint.Group is null)
+            .Select(static endpoint => endpoint.Method)
+            .OrderBy(static method => method, StringComparer.Ordinal)
             .ToList();
 
-    private sealed record Model(
-        EquatableArray<EndpointInfo> Endpoints,
-        EquatableArray<GroupInfo> Groups,
-        string RootNamespace);
+    private static List<string> EndpointsInGroup(string group, IEnumerable<EndpointInfo> endpoints) =>
+        endpoints
+            .Where(endpoint => endpoint.Group == group)
+            .Select(static endpoint => endpoint.Method)
+            .OrderBy(static method => method, StringComparer.Ordinal)
+            .ToList();
 
-    private sealed record EndpointInfo(string Fqn, string? GroupFqn);
+    private static List<GroupInfo> GroupsWithUniqueNames(IEnumerable<GroupInfo> groups) =>
+        groups
+            .GroupBy(static grp => grp.Name, StringComparer.Ordinal)
+            .Where(static grouping => grouping.Count() == 1)
+            .Select(static grouping => grouping.First())
+            .OrderBy(static group => group.Type, StringComparer.Ordinal)
+            .ToList();
 
-    private sealed record GroupInfo(string Fqn, string Name);
+    private sealed record EndpointInfo(string Method, string? Group);
+
+    private sealed record GroupInfo(string Type, string Name);
+
+    private sealed record Model(EquatableArray<EndpointInfo> Endpoints, EquatableArray<GroupInfo> GroupDeclarations, string RootNamespace);
+
+    private sealed record TemplateModel(string RootNamespace, List<string> Endpoints, List<TemplateGroup> Groups);
+    private sealed record TemplateGroup(string Type, string Name, List<string> Endpoints);
 }

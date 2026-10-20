@@ -1,11 +1,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Plugboard.Endpoints.Generator.Utils;
 using static Plugboard.Endpoints.Generator.Diagnostics;
-using static Plugboard.Endpoints.Generator.EndpointContracts;
 
 namespace Plugboard.Endpoints.Generator;
 
@@ -13,7 +11,7 @@ namespace Plugboard.Endpoints.Generator;
 public sealed class EndpointAnalyzer : DiagnosticAnalyzer
 {
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        [MissingMapEndpoint, MissingMapEndpointGroup, GroupNotMarked, UnusableType, DuplicateGroupName];
+        [InvalidMapEndpoint, MissingCreateGroup, GroupNotMarked, DeclaredInGenericType, DuplicateGroupName];
 
     public override void Initialize(AnalysisContext context)
     {
@@ -22,89 +20,74 @@ public sealed class EndpointAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(static startContext =>
         {
-            INamedTypeSymbol? endpointAttribute = startContext.Compilation.GetTypeByMetadataName(EndpointAttributeName);
-            INamedTypeSymbol? groupAttribute = startContext.Compilation.GetTypeByMetadataName(EndpointGroupAttributeName);
+            var types = WellKnownTypes.FindWellKnownTypes(startContext.Compilation);
 
-            if (endpointAttribute is null || groupAttribute is null)
+            //Stop analysis if not all required types are in the compilation
+            if (types is null)
             {
                 return;
             }
 
             var groups = new ConcurrentBag<INamedTypeSymbol>();
 
-            startContext.RegisterSymbolAction(ctx => AnalyzeType(ctx, endpointAttribute, groupAttribute, groups),
-                SymbolKind.NamedType);
-
+            startContext.RegisterSymbolAction(ctx => AnalyzeMethod(ctx, types), SymbolKind.Method);
+            startContext.RegisterSymbolAction(ctx => AnalyzeType(ctx, types, groups), SymbolKind.NamedType);
             startContext.RegisterCompilationEndAction(ctx => ReportDuplicateGroupNames(ctx, groups));
         });
     }
 
-    private static bool IsEndpoint(INamedTypeSymbol type, INamedTypeSymbol endpointAttribute,
-        [NotNullWhen(true)] out AttributeData? endpoint)
+    private static void AnalyzeMethod(SymbolAnalysisContext context, WellKnownTypes types)
     {
-        endpoint = type.GetAttributes()
-            .FirstOrDefault(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass,
-                endpointAttribute));
+        var method = (IMethodSymbol)context.Symbol;
+        AttributeData? mapEndpointAttribute = method.FindAttribute(types.MapEndpointAttribute);
 
-        return endpoint is not null;
-    }
-
-    private static bool IsGroup(INamedTypeSymbol type, INamedTypeSymbol groupAttribute) => type.GetAttributes()
-        .Any(attributeData => SymbolEqualityComparer.Default.Equals(attributeData.AttributeClass, groupAttribute));
-
-    private static void AnalyzeEndpoint(SymbolAnalysisContext context, INamedTypeSymbol type, AttributeData endpoint)
-    {
-        if (!IsValidType(type))
+        if (mapEndpointAttribute is null)
         {
-            context.ReportDiagnostic(Diagnostic.Create(UnusableType, type.Location, type.Name));
             return;
         }
 
-        if (!HasMapEndpoint(type))
+        if (MapEndpoint.IsDeclaredInGenericType(method))
         {
-            context.ReportDiagnostic(Diagnostic.Create(MissingMapEndpoint, type.Location, type.Name));
+            context.ReportDiagnostic(Diagnostic.Create(DeclaredInGenericType, method.Location, method.Name));
         }
 
-        INamedTypeSymbol? group = GetGroupType(endpoint);
-
-        if (group is not null && !HasAttribute(group, EndpointGroupAttributeName))
+        if (!MapEndpoint.HasExpectedSignature(method, types))
         {
-            Location attributeLocation = endpoint.ApplicationSyntaxReference
-                ?.GetSyntax(context.CancellationToken).GetLocation() ?? type.Location;
+            context.ReportDiagnostic(Diagnostic.Create(InvalidMapEndpoint, method.Location, method.Name));
+        }
+
+        INamedTypeSymbol? group = MapEndpoint.GroupOf(mapEndpointAttribute);
+
+        if (group is not null && !EndpointGroup.IsMarked(group, types))
+        {
+            Location attributeLocation = mapEndpointAttribute.ApplicationSyntaxReference
+                ?.GetSyntax(context.CancellationToken).GetLocation() ?? method.Location;
             context.ReportDiagnostic(Diagnostic.Create(GroupNotMarked, attributeLocation, group.Name));
-        }
-    }
-
-    private static void AnalyzeGroup(SymbolAnalysisContext context, INamedTypeSymbol type)
-    {
-        if (!IsValidType(type))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(UnusableType, type.Location, type.Name));
-        }
-
-        if (!HasMapEndpointGroup(type))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(MissingMapEndpointGroup, type.Location, type.Name));
         }
     }
 
     private static void AnalyzeType(
         SymbolAnalysisContext context,
-        INamedTypeSymbol endpointAttribute,
-        INamedTypeSymbol groupAttribute,
+        WellKnownTypes types,
         ConcurrentBag<INamedTypeSymbol> groups)
     {
         var type = (INamedTypeSymbol)context.Symbol;
 
-        if (IsEndpoint(type, endpointAttribute, out AttributeData? endpoint))
+        if (!EndpointGroup.IsMarked(type, types))
         {
-            AnalyzeEndpoint(context, type, endpoint);
+            return;
         }
 
-        if (IsGroup(type, groupAttribute))
+        groups.Add(type);
+
+        if (EndpointGroup.IsGeneric(type))
         {
-            groups.Add(type);
-            AnalyzeGroup(context, type);
+            context.ReportDiagnostic(Diagnostic.Create(DeclaredInGenericType, type.Location, type.Name));
+        }
+
+        if (!EndpointGroup.HasCreateGroup(type, types))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(MissingCreateGroup, type.Location, type.Name));
         }
     }
 

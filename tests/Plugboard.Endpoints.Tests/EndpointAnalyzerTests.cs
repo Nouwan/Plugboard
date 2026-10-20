@@ -10,35 +10,30 @@ namespace Plugboard.Endpoints.Tests;
 internal sealed class EndpointAnalyzerTests
 {
     [Test]
-    public Task Analyze_WithValidEndpointAndGroup_ShouldReportNothing() => Analyze("""
+    public Task Analyze_WithValidEndpointsAndGroup_ShouldReportNothing() => Analyze("""
         using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
         public static class TodoGroup
         {
-            public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+            public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
+
+            [MapEndpoint(typeof(TodoGroup))]
+            public static void MapList(IEndpointRouteBuilder group) { }
         }
 
-        [Endpoint(typeof(TodoGroup))]
         public sealed class GetTodoEndpoint
         {
-            public static void MapEndpoint(IEndpointRouteBuilder app) { }
+            [MapEndpoint(typeof(TodoGroup))]
+            public static void Map(IEndpointRouteBuilder app) { }
         }
 
-        [Endpoint]
-        public static class HealthEndpoint
+        public abstract class HealthEndpoint
         {
-            internal static void MapEndpoint(IEndpointRouteBuilder app) { }
+            [MapEndpoint]
+            internal static void Map(IEndpointRouteBuilder app) { }
         }
-        """);
-
-    [Test]
-    public Task Analyze_WithEndpointMissingMapEndpoint_ShouldReportPB101() => Analyze("""
-        using Plugboard.Endpoints;
-
-        [Endpoint]
-        public static class {|PB101:BrokenEndpoint|} { }
         """);
 
     [Test]
@@ -46,10 +41,22 @@ internal sealed class EndpointAnalyzerTests
         using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
-        [Endpoint]
-        public sealed class {|PB101:BrokenEndpoint|}
+        public sealed class BrokenEndpoint
         {
-            public void MapEndpoint(IEndpointRouteBuilder app) { }
+            [MapEndpoint]
+            public void {|PB101:Map|}(IEndpointRouteBuilder app) { }
+        }
+        """);
+
+    [Test]
+    public Task Analyze_WithPrivateMapEndpoint_ShouldReportPB101() => Analyze("""
+        using Plugboard.Endpoints;
+        using Microsoft.AspNetCore.Routing;
+
+        public static class BrokenEndpoint
+        {
+            [MapEndpoint]
+            private static void {|PB101:Map|}(IEndpointRouteBuilder app) { }
         }
         """);
 
@@ -58,15 +65,39 @@ internal sealed class EndpointAnalyzerTests
         using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
-        [Endpoint]
-        public static class {|PB101:BrokenEndpoint|}
+        public static class BrokenEndpoint
         {
-            public static void MapEndpoint(RouteGroupBuilder app) { }
+            [MapEndpoint]
+            public static void {|PB101:Map|}(RouteGroupBuilder app) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithGroupMissingMapEndpointGroup_ShouldReportPB102() => Analyze("""
+    public Task Analyze_WithNonVoidMapEndpoint_ShouldReportPB101() => Analyze("""
+        using Plugboard.Endpoints;
+        using Microsoft.AspNetCore.Routing;
+
+        public static class BrokenEndpoint
+        {
+            [MapEndpoint]
+            public static IEndpointRouteBuilder {|PB101:Map|}(IEndpointRouteBuilder app) => app;
+        }
+        """);
+
+    [Test]
+    public Task Analyze_WithGenericMapEndpoint_ShouldReportPB101() => Analyze("""
+        using Plugboard.Endpoints;
+        using Microsoft.AspNetCore.Routing;
+
+        public static class BrokenEndpoint
+        {
+            [MapEndpoint]
+            public static void {|PB101:Map|}<T>(IEndpointRouteBuilder app) { }
+        }
+        """);
+
+    [Test]
+    public Task Analyze_WithGroupMissingCreateGroup_ShouldReportPB102() => Analyze("""
         using Plugboard.Endpoints;
 
         [EndpointGroup]
@@ -74,14 +105,14 @@ internal sealed class EndpointAnalyzerTests
         """);
 
     [Test]
-    public Task Analyze_WithVoidMapEndpointGroup_ShouldReportPB102() => Analyze("""
+    public Task Analyze_WithVoidCreateGroup_ShouldReportPB102() => Analyze("""
         using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
         public static class {|PB102:TodoGroup|}
         {
-            public static void MapEndpointGroup(IEndpointRouteBuilder app) { }
+            public static void CreateGroup(IEndpointRouteBuilder app) { }
         }
         """);
 
@@ -104,37 +135,79 @@ internal sealed class EndpointAnalyzerTests
 
         public static class NotAGroup
         {
-            public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+            public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
         }
 
-        [{|PB103:Endpoint(typeof(NotAGroup))|}]
         public static class OrphanEndpoint
         {
-            public static void MapEndpoint(IEndpointRouteBuilder app) { }
+            [{|PB103:MapEndpoint(typeof(NotAGroup))|}]
+            public static void Map(IEndpointRouteBuilder app) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithGenericEndpoint_ShouldReportPB104() => Analyze("""
+    public Task Analyze_WithMapEndpointInGenericType_ShouldReportPB104() => Analyze("""
         using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
-        [Endpoint]
-        public static class {|PB104:GenericEndpoint|}<T>
+        public static class GenericEndpoint<T>
         {
-            public static void MapEndpoint(IEndpointRouteBuilder app) { }
+            [MapEndpoint]
+            public static void {|PB104:Map|}(IEndpointRouteBuilder app) { }
         }
         """);
 
     [Test]
-    public Task Analyze_WithAbstractGroup_ShouldReportPB104() => Analyze("""
+    public Task Analyze_WithMapEndpointNestedInGenericType_ShouldReportPB104() => Analyze("""
+        using Plugboard.Endpoints;
+        using Microsoft.AspNetCore.Routing;
+
+        public static class Outer<T>
+        {
+            public static class Inner
+            {
+                [MapEndpoint]
+                public static void {|PB104:Map|}(IEndpointRouteBuilder app) { }
+            }
+        }
+        """);
+
+    [Test]
+    public Task Analyze_WithAbstractGroup_ShouldReportNothing() => Analyze("""
         using Plugboard.Endpoints;
         using Microsoft.AspNetCore.Routing;
 
         [EndpointGroup]
-        public abstract class {|PB104:AbstractGroup|}
+        public abstract class AbstractGroup
         {
-            public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+            public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
+        }
+        """);
+
+    [Test]
+    public Task Analyze_WithGenericGroup_ShouldReportPB104() => Analyze("""
+        using Plugboard.Endpoints;
+        using Microsoft.AspNetCore.Routing;
+
+        [EndpointGroup]
+        public static class {|PB104:GenericGroup|}<T>
+        {
+            public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
+        }
+        """);
+
+    [Test]
+    public Task Analyze_WithGroupNestedInGenericType_ShouldReportPB104() => Analyze("""
+        using Plugboard.Endpoints;
+        using Microsoft.AspNetCore.Routing;
+
+        public static class Outer<T>
+        {
+            [EndpointGroup]
+            public static class {|PB104:NestedGroup|}
+            {
+                public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
+            }
         }
         """);
 
@@ -148,7 +221,7 @@ internal sealed class EndpointAnalyzerTests
             [EndpointGroup]
             public static class {|PB105:TodoGroup|}
             {
-                public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+                public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
             }
         }
 
@@ -157,7 +230,7 @@ internal sealed class EndpointAnalyzerTests
             [EndpointGroup]
             public static class {|PB105:TodoGroup|}
             {
-                public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app) => null!;
+                public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app) => null!;
             }
         }
         """);
@@ -170,7 +243,7 @@ internal sealed class EndpointAnalyzerTests
             TestCode = source,
             ReferenceAssemblies = TestReferences.Net100AspNetCore
         };
-        test.TestState.AdditionalReferences.Add(typeof(EndpointAttribute).Assembly);
+        test.TestState.AdditionalReferences.Add(typeof(MapEndpointAttribute).Assembly);
         return test.RunAsync();
     }
 }

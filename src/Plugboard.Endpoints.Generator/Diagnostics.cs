@@ -6,18 +6,18 @@ internal static class Diagnostics
 {
     private const string Category = "Plugboard";
 
-    public static readonly DiagnosticDescriptor MissingMapEndpoint = new(
+    public static readonly DiagnosticDescriptor InvalidMapEndpoint = new(
         id: "PB101",
-        title: "Endpoint must declare MapEndpoint",
-        messageFormat: "Endpoint '{0}' must declare 'public static void MapEndpoint(IEndpointRouteBuilder app)'",
+        title: "[MapEndpoint] method must be a static void method taking IEndpointRouteBuilder",
+        messageFormat: "Method '{0}' is marked [MapEndpoint] but is not a public or internal, non-generic 'static void {0}(IEndpointRouteBuilder app)'",
         category: Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static readonly DiagnosticDescriptor MissingMapEndpointGroup = new(
+    public static readonly DiagnosticDescriptor MissingCreateGroup = new(
         id: "PB102",
-        title: "Endpoint group must declare MapEndpointGroup",
-        messageFormat: "Endpoint group '{0}' must declare 'public static RouteGroupBuilder MapEndpointGroup(IEndpointRouteBuilder app)'",
+        title: "Endpoint group must declare CreateGroup",
+        messageFormat: "Endpoint group '{0}' must declare 'public static RouteGroupBuilder CreateGroup(IEndpointRouteBuilder app)'",
         category: Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -30,10 +30,10 @@ internal static class Diagnostics
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static readonly DiagnosticDescriptor UnusableType = new(
+    public static readonly DiagnosticDescriptor DeclaredInGenericType = new(
         id: "PB104",
-        title: "Endpoint types must be non-generic and non-abstract",
-        messageFormat: "Type '{0}' cannot be an endpoint or endpoint group because it is generic or abstract; generated code must be able to call its static members",
+        title: "Endpoints and endpoint groups must not be declared in generic types",
+        messageFormat: "'{0}' is declared in a generic type; generated code cannot call it without type arguments",
         category: Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -41,7 +41,7 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor DuplicateGroupName = new(
         id: "PB105",
         title: "Endpoint group names must be unique",
-        messageFormat: "Endpoint group '{0}' shares its name with another group; the generated Register{1}() method would collide. Rename one of the groups.",
+        messageFormat: "Endpoint group '{0}' shares its name with another group; the generated Map{1}() method would collide. Rename one of the groups.",
         category: Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
