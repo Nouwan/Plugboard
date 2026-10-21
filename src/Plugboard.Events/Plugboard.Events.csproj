@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>Plugboard.Events</RootNamespace>
+        <PackageId>Plugboard.Events</PackageId>
+        <Description>Source-generated integration events for modular monoliths</Description>
+        <PackageTags>events;outbox;integration-events;source-generator;analyzer</PackageTags>
+        <IsPackable>true</IsPackable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DevelopmentDependency>false</DevelopmentDependency>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Build ordering only; the generator + analyzer assembly ships inside this package under analyzers/dotnet/cs. -->
+        <ProjectReference Include="..\Plugboard.Events.Generator\Plugboard.Events.Generator.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all" />
+        <None Include="..\Plugboard.Events.Generator\bin\$(Configuration)\netstandard2.0\Plugboard.Events.Generator.dll"
+              Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+        <None Include="build\Plugboard.Events.targets" Pack="true" PackagePath="build\" />
+    </ItemGroup>
+
+</Project>

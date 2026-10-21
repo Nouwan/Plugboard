@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <RootNamespace>Plugboard.Events.Generator</RootNamespace>
+        <AssemblyName>Plugboard.Events.Generator</AssemblyName>
+        <IsPackable>false</IsPackable>
+        <IsRoslynComponent>true</IsRoslynComponent>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
+        <!-- Scriban uses trimming/AOT attributes that PolySharp skips by default (treated as runtime-provided).
+             Force PolySharp to polyfill them so the Scriban sources compile against netstandard2.0. -->
+        <PolySharpIncludeRuntimeSupportedAttributes>true</PolySharpIncludeRuntimeSupportedAttributes>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all"/>
+        <PackageReference Include="Scriban" IncludeAssets="build" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.CSharp" PrivateAssets="all"/>
+        <PackageReference Include="PolySharp" PrivateAssets="all"/>
+        <PackageReference Include="JetBrains.Annotations"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Subscriptions.sbn-cs" LogicalName="Subscriptions.sbn-cs">
+          <DependentUpon>EventGenerator.cs</DependentUpon>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Events.sbn-cs" LogicalName="Events.sbn-cs">
+          <DependentUpon>EventGenerator.cs</DependentUpon>
+        </EmbeddedResource>
+        <EmbeddedResource Include="SubscriptionInterceptors.sbn-cs" LogicalName="SubscriptionInterceptors.sbn-cs">
+          <DependentUpon>EventGenerator.cs</DependentUpon>
+        </EmbeddedResource>
+    </ItemGroup>
+</Project>

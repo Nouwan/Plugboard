@@ -2,9 +2,12 @@
   <Folder Name="/src/">
     <Project Path="src/Plugboard.Endpoints/Plugboard.Endpoints.csproj" />
     <Project Path="src/Plugboard.Endpoints.Generator/Plugboard.Endpoints.Generator.csproj" />
+    <Project Path="src/Plugboard.Events/Plugboard.Events.csproj" />
+    <Project Path="src/Plugboard.Events.Generator/Plugboard.Events.Generator.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Plugboard.Endpoints.Tests/Plugboard.Endpoints.Tests.csproj" />
+    <Project Path="tests/Plugboard.Events.Tests/Plugboard.Events.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

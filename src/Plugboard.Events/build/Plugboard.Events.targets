@@ -1,0 +1,7 @@
+<Project>
+  <!-- The generator rewrites ISubscriptionBuilder.On(...) calls with C# interceptors; the compiler only accepts
+       interceptors from namespaces listed here. Imported into every project referencing the package. -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Plugboard.Events.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+</Project>
