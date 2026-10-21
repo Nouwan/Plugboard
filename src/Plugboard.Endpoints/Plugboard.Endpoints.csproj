@@ -12,6 +12,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+
         <!-- Build ordering only; the generator + analyzer assembly ships inside this package under analyzers/dotnet/cs. -->
         <ProjectReference Include="..\Plugboard.Endpoints.Generator\Plugboard.Endpoints.Generator.csproj"
                           ReferenceOutputAssembly="false" PrivateAssets="all" />
