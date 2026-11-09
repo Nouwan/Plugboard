@@ -25,6 +25,9 @@ dotnet_diagnostic.CA1852.severity = warning
 
 # Language / style
 csharp_style_namespace_declarations = file_scoped:warning
+# Folders group code per concern; the namespace stays the package's root namespace
+dotnet_style_namespace_match_folder = false
+dotnet_diagnostic.IDE0130.severity = none
 csharp_prefer_braces = true:warning
 csharp_preferred_modifier_order = public, private, protected, internal, file, new, static, abstract, virtual, sealed, readonly, override, extern, unsafe, volatile, async, required:suggestion
 csharp_new_line_before_members_in_object_initializers = false
@@ -95,6 +98,7 @@ csharp_parentheses_redundancy_style = remove_if_not_clarifies_precedence
 
 # ReSharper / Rider inspections: style
 resharper_arrange_namespace_body_highlighting = warning
+resharper_check_namespace_highlighting = none
 resharper_arrange_modifiers_order_highlighting = warning
 resharper_arrange_missing_parentheses_highlighting = warning
 resharper_arrange_redundant_parentheses_highlighting = hint

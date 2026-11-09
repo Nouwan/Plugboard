@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>Plugboard.Events</RootNamespace>
+        <PackageId>Plugboard.Events</PackageId>
+        <Description>Source-generated integration events for modular monoliths, stored with your entities through Entity Framework Core</Description>
+        <PackageTags>events;outbox;integration-events;entity-framework-core;source-generator;analyzer</PackageTags>
+        <IsPackable>true</IsPackable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DevelopmentDependency>false</DevelopmentDependency>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+        <PackageReference Include="Microsoft.Extensions.Options" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Plugboard.Events.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Build ordering only; the generator + analyzer assembly ships inside this package under analyzers/dotnet/cs. -->
+        <ProjectReference Include="..\Plugboard.Events.Generator\Plugboard.Events.Generator.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all" />
+        <None Include="..\Plugboard.Events.Generator\bin\$(Configuration)\netstandard2.0\Plugboard.Events.Generator.dll"
+              Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+        <None Include="build\Plugboard.Events.targets" Pack="true" PackagePath="build\" />
+    </ItemGroup>
+
+</Project>
