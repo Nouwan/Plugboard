@@ -11,9 +11,7 @@ internal static class EventContracts
     public const string EventContextInterfaceName = "Plugboard.Events.IEventContext";
     public const string BuilderTypeName = "Plugboard.Events.SubscriptionBuilder";
     public const string SubscribeMethodName = "Subscribe";
-    public const string SubscribeAllMethodName = "SubscribeAll";
-    private const string EventEnvelopeName = "Plugboard.Events.EventEnvelope";
-    private const string HandlerContextName = "Plugboard.Events.HandlerContext";
+    private const string SubscriptionContextName = "Plugboard.Events.SubscriptionContext";
     private const string CancellationTokenName = "System.Threading.CancellationToken";
     private const string TaskName = "System.Threading.Tasks.Task";
 
@@ -55,10 +53,10 @@ internal static class EventContracts
     /// </summary>
     public static SubscribeCall? GetSubscribeCall(InvocationExpressionSyntax invocation, SemanticModel semanticModel, CancellationToken cancellationToken)
     {
-        if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: SubscribeMethodName or SubscribeAllMethodName }
+        if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: SubscribeMethodName }
             || semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method
             || method.ContainingType.ToDisplayString() != BuilderTypeName
-            || method.Name is not (SubscribeMethodName or SubscribeAllMethodName)
+            || method.Name != SubscribeMethodName
             || invocation.ArgumentList.Arguments.Count != method.Parameters.Length)
         {
             return null;
@@ -71,28 +69,19 @@ internal static class EventContracts
         IMethodSymbol? handler = handlerInfo.Symbol as IMethodSymbol
             ?? (handlerInfo.CandidateSymbols is [IMethodSymbol candidate] ? candidate : null);
 
-        return new SubscribeCall(
-            All: method.Name == SubscribeAllMethodName,
-            HandlerArgument: handlerArgument,
-            Handler: handler);
+        return new SubscribeCall(HandlerArgument: handlerArgument, Handler: handler);
     }
 
     /// <summary>
     /// Describes a handler delegate, or returns null when it is not <c>Task (TEvent, ...)</c> with TEvent marked
-    /// [Event] for Subscribe or EventEnvelope for SubscribeAll, followed by at most one HandlerContext, at most one
-    /// CancellationToken and any number of services to resolve from the delivery scope.
+    /// [Event], followed by at most one SubscriptionContext, at most one CancellationToken and any number of services to
+    /// resolve from the delivery scope.
     /// </summary>
-    public static HandlerSignature? DescribeHandler(IMethodSymbol handler, bool all)
+    public static HandlerSignature? DescribeHandler(IMethodSymbol handler)
     {
         if (handler.ReturnType.ToDisplayString() != TaskName
-            || handler.Parameters is not [{ Type: INamedTypeSymbol eventType }, .. var rest])
-        {
-            return null;
-        }
-
-        bool isEnvelope = eventType.ToDisplayString() == EventEnvelopeName;
-
-        if (all ? !isEnvelope : (isEnvelope || !IsValidEvent(eventType)))
+            || handler.Parameters is not [{ Type: INamedTypeSymbol eventType }, .. var rest]
+            || !IsValidEvent(eventType))
         {
             return null;
         }
@@ -111,13 +100,13 @@ internal static class EventContracts
             extras.Add(extra);
         }
 
-        return new HandlerSignature(isEnvelope ? null : eventType, extras);
+        return new HandlerSignature(eventType, extras);
     }
 
     /// <summary>Primitives, strings and other value types cannot be services, so they are rejected rather than resolved.</summary>
     private static HandlerParameter? DescribeExtra(ITypeSymbol type) => type.ToDisplayString() switch
     {
-        HandlerContextName => new HandlerParameter(ExtraKind.Context, null),
+        SubscriptionContextName => new HandlerParameter(ExtraKind.Context, null),
         CancellationTokenName => new HandlerParameter(ExtraKind.CancellationToken, null),
         _ when type.SpecialType == SpecialType.None && type.IsReferenceType && type.TypeKind != TypeKind.Error =>
             new HandlerParameter(ExtraKind.Service, type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
@@ -135,11 +124,10 @@ internal enum ExtraKind
 /// <param name="ServiceType">Fully qualified service type for <see cref="ExtraKind.Service"/>, otherwise null.</param>
 internal sealed record HandlerParameter(ExtraKind Kind, string? ServiceType);
 
-/// <param name="EventType">The handled event type, or null for a handler receiving every event.</param>
+/// <param name="EventType">The handled event type.</param>
 /// <param name="Extras">Parameters following the event, in declaration order.</param>
-internal sealed record HandlerSignature(INamedTypeSymbol? EventType, IReadOnlyList<HandlerParameter> Extras);
+internal sealed record HandlerSignature(INamedTypeSymbol EventType, IReadOnlyList<HandlerParameter> Extras);
 
-/// <param name="All">True for SubscribeAll, whose handler receives every event as an EventEnvelope.</param>
 /// <param name="HandlerArgument">The lambda or method group expression passed as handler.</param>
 /// <param name="Handler">The bound delegate method, or null when the argument could not be bound.</param>
-internal sealed record SubscribeCall(bool All, ExpressionSyntax HandlerArgument, IMethodSymbol? Handler);
+internal sealed record SubscribeCall(ExpressionSyntax HandlerArgument, IMethodSymbol? Handler);

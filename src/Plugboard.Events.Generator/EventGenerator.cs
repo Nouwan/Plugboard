@@ -48,7 +48,7 @@ public sealed class EventGenerator : IIncrementalGenerator
             : null;
 
     private static bool IsSubscribeInvocation(SyntaxNode node, CancellationToken _) =>
-        node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: SubscribeMethodName or SubscribeAllMethodName } };
+        node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: SubscribeMethodName } };
 
     private static string? ToSubscribeMethod(GeneratorAttributeSyntaxContext context, CancellationToken _) =>
         context.TargetSymbol is IMethodSymbol method && IsValidSubscribeMethod(method)
@@ -60,7 +60,7 @@ public sealed class EventGenerator : IIncrementalGenerator
         var invocation = (InvocationExpressionSyntax)context.Node;
 
         if (GetSubscribeCall(invocation, context.SemanticModel, cancellationToken) is not { Handler: { } handler } call
-            || DescribeHandler(handler, call.All) is not { } signature
+            || DescribeHandler(handler) is not { } signature
             || context.SemanticModel.GetInterceptableLocation(invocation, cancellationToken) is not { } location)
         {
             return null;
@@ -81,9 +81,9 @@ public sealed class EventGenerator : IIncrementalGenerator
         return new InterceptorInfo(
             Version: location.Version,
             Data: location.Data,
-            Method: call.All ? SubscribeAllMethodName : SubscribeMethodName,
+            Method: SubscribeMethodName,
             DelegateType: delegateType,
-            Register: signature.EventType is null ? "RegisterAll" : $"Register<{signature.EventType.FullyQualifiedName}>",
+            Register: $"Register<{signature.EventType.FullyQualifiedName}>",
             Call: typedCall);
     }
 
@@ -128,8 +128,8 @@ public sealed class EventGenerator : IIncrementalGenerator
     /// <param name="Version">Interceptable location version, as the compiler wants it in [InterceptsLocation].</param>
     /// <param name="Data">Opaque interceptable location data.</param>
     /// <param name="DelegateType">The handler's natural delegate type, used to cast the Delegate argument.</param>
-    /// <param name="Method">The intercepted method, Subscribe or SubscribeAll; the interceptor must carry the same name.</param>
-    /// <param name="Register">SubscriptionServices method to call: generic Register for the event, or RegisterAll.</param>
-    /// <param name="Call">C# expression invoking the typed handler with <c>e</c>, <c>envelope</c>, <c>ctx</c>, <c>sp</c> and <c>ct</c>.</param>
+    /// <param name="Method">The intercepted method; the interceptor must carry the same name.</param>
+    /// <param name="Register">SubscriptionServices method to call: generic Register for the event.</param>
+    /// <param name="Call">C# expression invoking the typed handler with <c>e</c>, <c>ctx</c>, <c>sp</c> and <c>ct</c>.</param>
     private sealed record InterceptorInfo(int Version, string Data, string Method, string DelegateType, string Register, string Call);
 }

@@ -34,7 +34,7 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor InvalidHandler = new(
         id: "PB205",
         title: "Event handler must have a valid signature",
-        messageFormat: "Handler must be a lambda or method returning Task whose first parameter is an [Event] type for Subscribe or EventEnvelope for SubscribeAll, followed by at most one HandlerContext, at most one CancellationToken and services to resolve; primitives and value types cannot be resolved",
+        messageFormat: "Handler must be a lambda or method returning Task whose first parameter is an [Event] type, followed by at most one SubscriptionContext, at most one CancellationToken and services to resolve; primitives and value types cannot be resolved",
         category: Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);

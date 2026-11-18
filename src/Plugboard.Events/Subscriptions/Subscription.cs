@@ -3,7 +3,7 @@ namespace Plugboard.Events;
 /// <summary>One subscribed handler and its settings.</summary>
 public sealed class Subscription
 {
-    internal Subscription(string name, string? eventName, Func<EventEnvelope, HandlerContext, IServiceProvider, CancellationToken, Task> invoke)
+    internal Subscription(string name, string eventName, Func<EventEnvelope, SubscriptionContext, IServiceProvider, CancellationToken, Task> invoke)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Name = name;
@@ -14,8 +14,8 @@ public sealed class Subscription
     /// <summary>The stable name of the subscription.</summary>
     public string Name { get; }
 
-    /// <summary>The name of the event handled or null for every event.</summary>
-    public string? EventName { get; }
+    /// <summary>The name of the event handled.</summary>
+    public string EventName { get; }
 
     /// <summary>How long the handler may run before it is cancelled and the delivery counts as failed.</summary>
     public TimeSpan MaxDuration { get; private set; } = SubscriptionDefaults.MaxDuration;
@@ -24,7 +24,7 @@ public sealed class Subscription
     public int MaxAttempts { get; private set; } = SubscriptionDefaults.MaxAttempts;
 
     /// <summary>Deserializes the envelope's payload and calls the handler.</summary>
-    internal Func<EventEnvelope, HandlerContext, IServiceProvider, CancellationToken, Task> Invoke { get; }
+    internal Func<EventEnvelope, SubscriptionContext, IServiceProvider, CancellationToken, Task> Invoke { get; }
 
     /// <summary>Cancels the handler after <paramref name="maxDuration"/>.</summary>
     public Subscription WithMaxDuration(TimeSpan maxDuration)

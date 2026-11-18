@@ -12,11 +12,11 @@ namespace Plugboard.Events;
 /// inserts, and hands the deliveries to this host's channel once they are committed: at the end of a plain save, or
 /// when the transaction the save ran in is committed.
 /// </summary>
-internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IEnumerable<Subscription> subscriptions, IOptions<EventProcessorOptions> options)
+internal sealed class EventContextInterceptor(Channel<DeliveryQueueItem> channel, IEnumerable<Subscription> subscriptions)
     : SaveChangesInterceptor, IDbTransactionInterceptor
 {
     private readonly Subscription[] _subscriptions = [.. subscriptions];
-    private readonly HostId _host = new(options.Value.Host);
+    private readonly InstanceId _instance = InstanceId.Current;
     private readonly ConditionalWeakTable<DbContext, Batch> _batches = [];
 
     /// <inheritdoc/>
@@ -85,7 +85,7 @@ internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IE
             batch.TransactionId = null;
         }
 
-        DbSet<EventDelivery> queue = context.Set<EventDelivery>();
+        DbSet<DeliveryQueueItem> queue = context.Set<DeliveryQueueItem>();
         batch.Saving.RemoveAll(delivery => !queue.Local.Contains(delivery));
         HashSet<Guid> delivered = [.. batch.Saving.Select(static delivery => delivery.EventId)];
 
@@ -107,7 +107,7 @@ internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IE
             foreach (Subscription subscription in _subscriptions.Where(s => s.EventName is null || s.EventName == envelope.Name))
             {
                 // Born reserved for this host's workers: the first attempt counts from here.
-                var delivery = new EventDelivery { EventId = envelope.Id, Subscription = subscription.Name, Event = envelope, UpdatedAt = now }.Reserve(_host);
+                var delivery = DeliveryQueueItem.Create(envelope, subscription.Name, _instance);
                 queue.Add(delivery);
                 batch.Saving.Add(delivery);
             }
@@ -130,7 +130,7 @@ internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IE
             return;
         }
 
-        List<EventDelivery> inserted = [.. batch.Saving];
+        List<DeliveryQueueItem> inserted = [.. batch.Saving];
         _batches.Remove(context);
         await PublishAsync(inserted).ConfigureAwait(false);
     }
@@ -142,7 +142,7 @@ internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IE
             return;
         }
 
-        List<EventDelivery> parked = [.. batch.Parked];
+        List<DeliveryQueueItem> parked = [.. batch.Parked];
         _batches.Remove(context);
         await PublishAsync(parked).ConfigureAwait(false);
     }
@@ -155,9 +155,9 @@ internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IE
         }
     }
 
-    private async Task PublishAsync(List<EventDelivery> deliveries)
+    private async Task PublishAsync(List<DeliveryQueueItem> deliveries)
     {
-        foreach (EventDelivery delivery in deliveries)
+        foreach (DeliveryQueueItem delivery in deliveries)
         {
             await channel.Writer.WriteAsync(delivery, CancellationToken.None).ConfigureAwait(false);
         }
@@ -166,10 +166,10 @@ internal sealed class EventContextInterceptor(Channel<EventDelivery> channel, IE
     /// <summary>The rows of one context: those of the save under way, and those parked for an open transaction.</summary>
     private sealed class Batch
     {
-        public List<EventDelivery> Saving { get; } = [];
+        public List<DeliveryQueueItem> Saving { get; } = [];
 
         public Guid? TransactionId { get; set; }
 
-        public List<EventDelivery> Parked { get; } = [];
+        public List<DeliveryQueueItem> Parked { get; } = [];
     }
 }

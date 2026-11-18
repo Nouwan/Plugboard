@@ -12,16 +12,16 @@ namespace Plugboard.Events;
 /// </summary>
 internal sealed partial class EventSweeper<TContext>(
     IDbContextFactory<TContext> contexts,
-    Channel<EventDelivery> channel,
-    IOptions<EventProcessorOptions> options,
+    Channel<DeliveryQueueItem> channel,
+    IOptions<PlugboardEventsOptions> options,
     TimeProvider time,
     ILogger<EventSweeper<TContext>> logger) : BackgroundService
     where TContext : DbContext, IEventStoreContext
 {
     internal const int Limit = 50;
 
-    private readonly EventProcessorOptions _options = options.Value;
-    private readonly HostId _host = new(options.Value.Host);
+    private readonly PlugboardEventsOptions _options = options.Value;
+    private readonly InstanceId _instance = InstanceId.Current;
 
     /// <summary>Sweeps at start and then every interval; the intervals drift apart so hosts do not all read the same page at once.</summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,13 +52,13 @@ internal sealed partial class EventSweeper<TContext>(
     {
         DateTimeOffset now = time.GetUtcNow();
         int published = 0;
-        List<EventDelivery> claimed;
+        List<DeliveryQueueItem> claimed;
 
         do
         {
             claimed = await ClaimDueAsync(now, cancellationToken).ConfigureAwait(false);
 
-            foreach (EventDelivery delivery in claimed)
+            foreach (DeliveryQueueItem delivery in claimed)
             {
                 await channel.Writer.WriteAsync(delivery, cancellationToken).ConfigureAwait(false);
             }
@@ -71,15 +71,15 @@ internal sealed partial class EventSweeper<TContext>(
     }
 
     /// <summary>Reserves a page of due deliveries for this host.</summary>
-    private async Task<List<EventDelivery>> ClaimDueAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<List<DeliveryQueueItem>> ClaimDueAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         await using TContext context = await contexts.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
         // Own rows with a NotBefore time are retries and postponements; own rows without one are with a worker already.
-        List<EventDelivery> due = await context.Deliveries
+        List<DeliveryQueueItem> due = await context.DeliveryQueue
             .AsNoTracking()
             .Include(d => d.Event)
-            .Where(d => (d.LockedBy == null && (d.NotBefore == null || d.NotBefore <= now)) || (d.LockedBy == _host && d.NotBefore <= now))
+            .Where(d => (d.LockedBy == null && (d.NotBefore == null || d.NotBefore <= now)) || (d.LockedBy == _instance && d.NotBefore <= now))
             .OrderBy(d => d.NotBefore == null ? 0 : 1) // Fresh rows first on every provider; SQL Server and PostgreSQL sort nulls differently.
             .ThenBy(d => d.NotBefore)
             .ThenBy(d => d.EventId)
@@ -87,26 +87,15 @@ internal sealed partial class EventSweeper<TContext>(
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        List<EventDelivery> claimed = new(due.Count);
+        List<DeliveryQueueItem> claimed = new(due.Count);
 
-        foreach (EventDelivery seen in due)
+        foreach (DeliveryQueueItem seen in due)
         {
             // Only while the row is still as the page read it: another host may have taken it or a worker may have
             // rescheduled it since. Clearing NotBefore keeps the next page from reading it again.
-            EventDelivery reserved = seen.Reserve(_host);
-            int rows = await context.Deliveries
-                .Where(d => d.Id == seen.Id && d.Version == seen.Version)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(d => d.LockedBy, _host)
-                    .SetProperty(d => d.NotBefore, (DateTimeOffset?)null)
-                    .SetProperty(d => d.Attempts, reserved.Attempts)
-                    .SetProperty(d => d.UpdatedAt, reserved.UpdatedAt)
-                    .SetProperty(d => d.Version, reserved.Version), cancellationToken)
-                .ConfigureAwait(false);
-
-            if (rows == 1)
+            if (await context.ReserveAsync(seen, _instance, cancellationToken).ConfigureAwait(false))
             {
-                claimed.Add(reserved);
+                claimed.Add(seen);
             }
         }
 

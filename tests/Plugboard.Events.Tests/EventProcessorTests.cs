@@ -9,8 +9,8 @@ namespace Plugboard.Events.Tests;
 [TestFixture]
 internal sealed class EventProcessorTests
 {
-    private static readonly HostId Host1 = new("host-1");
-    private static readonly HostId Host2 = new("host-2");
+    private static readonly InstanceId Host1 = new("host-1");
+    private static readonly InstanceId Host2 = new("host-2");
     private static readonly DateTimeOffset Now = new(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
 
     [Event("order.placed")]
@@ -27,7 +27,7 @@ internal sealed class EventProcessorTests
 
         public Mailer Mailer { get; } = new();
 
-        public EventProcessorOptions Options { get; } = new() { Host = Host1.Value };
+        public PlugboardEventsOptions Options { get; } = new() { Host = Host1.Value };
 
         public FixedTime Time { get; } = new(Now);
 
@@ -42,18 +42,18 @@ internal sealed class EventProcessorTests
                 Time, Microsoft.Extensions.Options.Options.Create(Options), NullLogger<EventProcessor<ShopContext>>.Instance);
         }
 
-        public EventSweeper<ShopContext> BuildSweeper(HostId? host = null) =>
-            new(Db, Db.Channel, Microsoft.Extensions.Options.Options.Create(host is null ? Options : new EventProcessorOptions { Host = host.Value.Value }), Time, NullLogger<EventSweeper<ShopContext>>.Instance);
+        public EventSweeper<ShopContext> BuildSweeper(InstanceId? host = null) =>
+            new(Db, Db.Channel, Microsoft.Extensions.Options.Options.Create(host is null ? Options : new PlugboardEventsOptions { Host = host.Value.Value }), Time, NullLogger<EventSweeper<ShopContext>>.Instance);
 
         public EventHeartbeat<ShopContext> BuildHeartbeat() =>
             new(Db, Microsoft.Extensions.Options.Options.Create(Options), Time, NullLogger<EventHeartbeat<ShopContext>>.Instance);
 
         /// <summary>Seeds one delivery of <see cref="Envelope"/> for send-confirmation, reserved for this host unless given.</summary>
-        public async Task<EventDelivery> Seed(EventDelivery? delivery = null) =>
+        public async Task<DeliveryQueueItem> Seed(DeliveryQueueItem? delivery = null) =>
             await Seed(Envelope, delivery ?? Free().Reserve(Host1));
 
         /// <summary>Seeds the event once and the delivery in the queue; returns the row as the processor would hold it.</summary>
-        public async Task<EventDelivery> Seed(EventEnvelope envelope, EventDelivery delivery)
+        public async Task<DeliveryQueueItem> Seed(EventEnvelope envelope, DeliveryQueueItem deliveryQueueItem)
         {
             await using ShopContext context = Db.CreateSeedContext();
 
@@ -62,30 +62,30 @@ internal sealed class EventProcessorTests
                 context.Events.Add(envelope);
             }
 
-            context.Deliveries.Add(delivery with { EventId = envelope.Id, Event = null! });
+            context.DeliveryQueue.Add(deliveryQueueItem with { EventId = envelope.Id, Event = null! });
             await context.SaveChangesAsync();
-            return delivery with { EventId = envelope.Id, Event = envelope };
+            return deliveryQueueItem with { EventId = envelope.Id, Event = envelope };
         }
 
-        public async Task Seed(params EventHost[] hosts)
+        public async Task Seed(params EventProcessor[] hosts)
         {
             await using ShopContext context = Db.CreateDbContext();
-            context.EventHosts.AddRange(hosts);
+            context.Instances.AddRange(hosts);
             await context.SaveChangesAsync();
         }
 
         /// <summary>A delivery nobody owns, never handed to a worker.</summary>
-        public EventDelivery Free(string handler = "send-confirmation") => new() { EventId = Envelope.Id, Subscription = handler };
+        public DeliveryQueueItem Free(string handler = "send-confirmation") => new() { EventId = Envelope.Id, Subscription = handler };
 
         public static EventEnvelope AnotherEvent() => EventEnvelope.Create(new OrderPlaced(0));
 
-        public async Task<List<EventDelivery>> Queue()
+        public async Task<List<DeliveryQueueItem>> Queue()
         {
             await using ShopContext context = Db.CreateDbContext();
-            return await context.Deliveries.AsNoTracking().Include(d => d.Event).OrderBy(d => d.EventId).ToListAsync();
+            return await context.DeliveryQueue.AsNoTracking().Include(d => d.Event).OrderBy(d => d.EventId).ToListAsync();
         }
 
-        public async Task<EventDelivery> Row(EventDelivery delivery) => (await Queue()).Single(d => d.Id == delivery.Id);
+        public async Task<DeliveryQueueItem> Row(DeliveryQueueItem deliveryQueueItem) => (await Queue()).Single(d => d.Id == deliveryQueueItem.Id);
 
         public async Task<List<DeliveryHistory>> History()
         {
@@ -100,14 +100,14 @@ internal sealed class EventProcessorTests
         }
 
         /// <summary>The rows without their stamp, for comparing against a transition made at another time.</summary>
-        public static List<EventDelivery> Unstamped(IEnumerable<EventDelivery> rows) => [.. rows.Select(Unstamped)];
+        public static List<DeliveryQueueItem> Unstamped(IEnumerable<DeliveryQueueItem> rows) => [.. rows.Select(Unstamped)];
 
-        public static EventDelivery Unstamped(EventDelivery row) => row with { UpdatedAt = default };
+        public static DeliveryQueueItem Unstamped(DeliveryQueueItem row) => row with { UpdatedAt = default };
 
-        public async Task<List<EventHost>> Hosts()
+        public async Task<List<EventProcessor>> Hosts()
         {
             await using ShopContext context = Db.CreateDbContext();
-            return await context.EventHosts.AsNoTracking().OrderBy(h => h.Id).ToListAsync();
+            return await context.Instances.AsNoTracking().OrderBy(h => h.Id).ToListAsync();
         }
 
         public void Dispose() => Db.Dispose();
@@ -125,7 +125,7 @@ internal sealed class EventProcessorTests
             return Task.CompletedTask;
         }));
 
-        EventDelivery reserved = await h.Seed();
+        DeliveryQueueItem reserved = await h.Seed();
         bool processed = await processor.ProcessAsync(reserved, CancellationToken.None);
 
         Assert.That(processed, Is.True);
@@ -155,7 +155,7 @@ internal sealed class EventProcessorTests
                 ctx.Postpone(TimeSpan.FromMinutes(5));
                 return Task.CompletedTask;
             }));
-        EventDelivery reserved = await h.Seed();
+        DeliveryQueueItem reserved = await h.Seed();
 
         await processor.ProcessAsync(reserved, CancellationToken.None);
 
@@ -168,7 +168,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             (e, ctx, sp, ct) => throw new InvalidOperationException("mail server down")));
-        EventDelivery reserved = await h.Seed();
+        DeliveryQueueItem reserved = await h.Seed();
 
         await processor.ProcessAsync(reserved, CancellationToken.None);
 
@@ -181,7 +181,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             (e, ctx, sp, ct) => throw new InvalidOperationException("still down")).WithMaxAttempts(3));
-        EventDelivery reserved = await h.Seed((h.Free() with { Attempts = 2 }).Reserve(Host1));
+        DeliveryQueueItem reserved = await h.Seed((h.Free() with { Attempts = 2 }).Reserve(Host1));
 
         await processor.ProcessAsync(reserved, CancellationToken.None);
 
@@ -201,7 +201,7 @@ internal sealed class EventProcessorTests
             return Task.CompletedTask;
         }).WithMaxAttempts(3));
         // Three earlier hand-overs never reported back: the hosts died mid-run and the rows were freed each time.
-        EventDelivery reserved = await h.Seed((h.Free() with { Attempts = 3 }).Reserve(Host1));
+        DeliveryQueueItem reserved = await h.Seed((h.Free() with { Attempts = 3 }).Reserve(Host1));
 
         await processor.ProcessAsync(reserved, CancellationToken.None);
 
@@ -232,7 +232,7 @@ internal sealed class EventProcessorTests
             invoked = true;
             return Task.CompletedTask;
         }));
-        EventDelivery theirs = await h.Seed(h.Free().Reserve(Host2));
+        DeliveryQueueItem theirs = await h.Seed(h.Free().Reserve(Host2));
 
         bool processed = await processor.ProcessAsync(theirs with { LockedBy = Host1 }, CancellationToken.None);
 
@@ -251,8 +251,8 @@ internal sealed class EventProcessorTests
             return Task.CompletedTask;
         }));
         // Another worker of this host ran the row and deferred it; the channel still holds the older copy.
-        EventDelivery reserved = h.Free().Reserve(Host1);
-        EventDelivery deferred = await h.Seed(reserved.Defer(Now.AddMinutes(1)));
+        DeliveryQueueItem reserved = h.Free().Reserve(Host1);
+        DeliveryQueueItem deferred = await h.Seed(reserved.Defer(Now.AddMinutes(1)));
 
         bool processed = await processor.ProcessAsync(reserved with { Event = h.Envelope }, CancellationToken.None);
 
@@ -279,7 +279,7 @@ internal sealed class EventProcessorTests
                     throw;
                 }
             }).WithMaxDuration(TimeSpan.FromMilliseconds(50)));
-        EventDelivery reserved = await h.Seed();
+        DeliveryQueueItem reserved = await h.Seed();
 
         await processor.ProcessAsync(reserved, CancellationToken.None);
         await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -311,7 +311,7 @@ internal sealed class EventProcessorTests
         {
             // This host was taken for dead meanwhile: its row was freed and another host took it.
             await using ShopContext context = h.Db.CreateDbContext();
-            await context.Deliveries
+            await context.DeliveryQueue
                 .Where(d => d.EventId == ctx.EventId && d.Subscription == "send-confirmation")
                 .ExecuteUpdateAsync(s => s.SetProperty(d => d.LockedBy, Host2).SetProperty(d => d.Version, d => d.Version + 2), ct);
         }));
@@ -335,7 +335,7 @@ internal sealed class EventProcessorTests
             return Task.CompletedTask;
         }));
         processor.StoreRetryDelay = TimeSpan.FromMilliseconds(10);
-        EventDelivery reserved = await h.Seed();
+        DeliveryQueueItem reserved = await h.Seed();
 
         Task<bool> processing = processor.ProcessAsync(reserved, CancellationToken.None);
         await Task.Delay(50);
@@ -357,7 +357,7 @@ internal sealed class EventProcessorTests
             handled.TrySetResult();
             return Task.CompletedTask;
         }));
-        EventDelivery reserved = await h.Seed();
+        DeliveryQueueItem reserved = await h.Seed();
         h.Db.Channel.Writer.TryWrite(reserved);
 
         await processor.StartAsync(CancellationToken.None);
@@ -372,14 +372,14 @@ internal sealed class EventProcessorTests
     public async Task Sweep_ShouldPublishDueFreeAndOwnDeliveriesOldestFirstWithTheirEvent()
     {
         using var h = new Harness();
-        EventDelivery fresh = await h.Seed(h.Free());
-        EventDelivery freed = await h.Seed(Harness.AnotherEvent(), h.Free() with { Attempts = 1, NotBefore = Now.AddSeconds(-5) });
-        EventDelivery ownRetry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddSeconds(-10)));
-        EventDelivery ownLater = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddMinutes(10)));
-        EventDelivery ownWithWorker = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1));
-        EventDelivery theirRetry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2).Defer(Now.AddSeconds(-5)));
-        EventDelivery theirs = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2));
-        EventDelivery notDue = await h.Seed(Harness.AnotherEvent(), h.Free() with { NotBefore = Now.AddMinutes(10) });
+        DeliveryQueueItem fresh = await h.Seed(h.Free());
+        DeliveryQueueItem freed = await h.Seed(Harness.AnotherEvent(), h.Free() with { Attempts = 1, NotBefore = Now.AddSeconds(-5) });
+        DeliveryQueueItem ownRetry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddSeconds(-10)));
+        DeliveryQueueItem ownLater = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddMinutes(10)));
+        DeliveryQueueItem ownWithWorker = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1));
+        DeliveryQueueItem theirRetry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2).Defer(Now.AddSeconds(-5)));
+        DeliveryQueueItem theirs = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2));
+        DeliveryQueueItem notDue = await h.Seed(Harness.AnotherEvent(), h.Free() with { NotBefore = Now.AddMinutes(10) });
 
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
 
@@ -398,7 +398,7 @@ internal sealed class EventProcessorTests
     public async Task Sweep_Twice_ShouldPublishAnOwnRetryOnce()
     {
         using var h = new Harness();
-        EventDelivery ownRetry = await h.Seed(h.Free().Reserve(Host1).Defer(Now.AddSeconds(-5)));
+        DeliveryQueueItem ownRetry = await h.Seed(h.Free().Reserve(Host1).Defer(Now.AddSeconds(-5)));
 
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
@@ -410,7 +410,7 @@ internal sealed class EventProcessorTests
     public async Task Sweep_ShouldGiveARowToOneHostOnly()
     {
         using var h = new Harness();
-        EventDelivery free = await h.Seed(h.Free());
+        DeliveryQueueItem free = await h.Seed(h.Free());
 
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
         await h.BuildSweeper(Host2).SweepAsync(CancellationToken.None);
@@ -423,13 +423,13 @@ internal sealed class EventProcessorTests
     public async Task Sweep_WhenARowChangedSinceItWasRead_ShouldLeaveItAlone()
     {
         using var h = new Harness();
-        EventDelivery snapshot = await h.Seed(h.Free());
+        DeliveryQueueItem snapshot = await h.Seed(h.Free());
         // Another host takes and defers the row between this host reading the page and claiming it.
-        EventDelivery deferred = snapshot.Reserve(Host2).Defer(Now.AddMinutes(1));
+        DeliveryQueueItem deferred = snapshot.Reserve(Host2).Defer(Now.AddMinutes(1));
         h.Db.AfterRead.Once = async () =>
         {
             await using ShopContext context = h.Db.CreateDbContext();
-            context.Deliveries.Update(deferred with { Event = null! });
+            context.DeliveryQueue.Update(deferred with { Event = null! });
             await context.SaveChangesAsync();
         };
 
@@ -449,8 +449,8 @@ internal sealed class EventProcessorTests
 
         await sweeper.StartAsync(CancellationToken.None);
         await Task.Delay(50); // The sweep at start found nothing; only a later sweep can find this one.
-        EventDelivery due = await h.Seed(h.Free());
-        EventDelivery published = await h.Db.Channel.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+        DeliveryQueueItem due = await h.Seed(h.Free());
+        DeliveryQueueItem published = await h.Db.Channel.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
         await sweeper.StopAsync(CancellationToken.None);
 
         Assert.That(Harness.Unstamped(published), Is.EqualTo(Harness.Unstamped(due.Reserve(Host1))));
@@ -477,19 +477,19 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
         h.Options.HostTimeout = TimeSpan.FromMinutes(5);
-        var dead = new HostId("dead");
-        await h.Seed(new EventHost(dead, Now.AddMinutes(-10)));
-        EventDelivery retry = await h.Seed(h.Free().Reserve(dead).Defer(Now.AddMinutes(1)));
+        var dead = new InstanceId("dead");
+        await h.Seed(new EventProcessor(dead, Now.AddMinutes(-10)));
+        DeliveryQueueItem retry = await h.Seed(h.Free().Reserve(dead).Defer(Now.AddMinutes(1)));
 
         await h.BuildHeartbeat().StartAsync(CancellationToken.None);
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
         Assert.That(h.Db.Published(), Is.Empty);
-        Assert.That(Harness.Unstamped(await h.Row(retry)), Is.EqualTo(Harness.Unstamped(retry.Free())));
+        Assert.That(Harness.Unstamped(await h.Row(retry)), Is.EqualTo(Harness.Unstamped(retry.FreeLock())));
 
         h.Time.Advance(TimeSpan.FromMinutes(1));
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
 
-        Assert.That(Harness.Unstamped(h.Db.Published()), Is.EqualTo(Harness.Unstamped([retry.Free().Reserve(Host1)])));
+        Assert.That(Harness.Unstamped(h.Db.Published()), Is.EqualTo(Harness.Unstamped([retry.FreeLock().Reserve(Host1)])));
     }
 
     [Test]
@@ -497,22 +497,22 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
         h.Options.HostTimeout = TimeSpan.FromMinutes(5);
-        var alive = new HostId("alive");
-        var stale = new HostId("stale");
-        var unknown = new HostId("unknown");
-        await h.Seed(new EventHost(alive, Now.AddMinutes(-1)), new EventHost(stale, Now.AddMinutes(-10)));
-        EventDelivery ofAlive = await h.Seed(h.Free().Reserve(alive));
-        EventDelivery ofStale = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(stale));
-        EventDelivery ofUnknown = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(unknown));
-        EventDelivery free = await h.Seed(Harness.AnotherEvent(), h.Free());
+        var alive = new InstanceId("alive");
+        var stale = new InstanceId("stale");
+        var unknown = new InstanceId("unknown");
+        await h.Seed(new EventProcessor(alive, Now.AddMinutes(-1)), new EventProcessor(stale, Now.AddMinutes(-10)));
+        DeliveryQueueItem ofAlive = await h.Seed(h.Free().Reserve(alive));
+        DeliveryQueueItem ofStale = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(stale));
+        DeliveryQueueItem ofUnknown = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(unknown));
+        DeliveryQueueItem free = await h.Seed(Harness.AnotherEvent(), h.Free());
 
         await h.BuildHeartbeat().StartAsync(CancellationToken.None);
 
         Assert.That(await h.Row(ofAlive), Is.EqualTo(ofAlive));
-        Assert.That(Harness.Unstamped(await h.Row(ofStale)), Is.EqualTo(Harness.Unstamped(ofStale.Free())), "freed, the attempt it was handed out for still counts");
+        Assert.That(Harness.Unstamped(await h.Row(ofStale)), Is.EqualTo(Harness.Unstamped(ofStale.FreeLock())), "freed, the attempt it was handed out for still counts");
         Assert.That((await h.Row(ofUnknown)).LockedBy, Is.Null, "an owner without a heartbeat row is as dead as a stale one");
         Assert.That(await h.Row(free), Is.EqualTo(free));
-        Assert.That(await h.Hosts(), Is.EqualTo([new EventHost(alive, Now.AddMinutes(-1)), new EventHost(Host1, Now)]));
+        Assert.That(await h.Hosts(), Is.EqualTo([new EventProcessor(alive, Now.AddMinutes(-1)), new EventProcessor(Host1, Now)]));
     }
 
     [Test]
@@ -524,15 +524,15 @@ internal sealed class EventProcessorTests
         EventHeartbeat<ShopContext> heartbeat = h.BuildHeartbeat();
 
         await heartbeat.StartAsync(CancellationToken.None);
-        Assert.That(await h.Hosts(), Is.EqualTo([new EventHost(Host1, Now)]), "written before anything else starts");
+        Assert.That(await h.Hosts(), Is.EqualTo([new EventProcessor(Host1, Now)]), "written before anything else starts");
 
         // host-2 died with a delivery at a worker; its heartbeat is two minutes old, so only a later beat can free it.
-        EventDelivery dead = await h.Seed(h.Free().Reserve(Host2));
-        await h.Seed(new EventHost(Host2, Now.AddMinutes(-2)));
+        DeliveryQueueItem dead = await h.Seed(h.Free().Reserve(Host2));
+        await h.Seed(new EventProcessor(Host2, Now.AddMinutes(-2)));
 
-        EventDelivery freed = await Eventually(() => h.Row(dead), row => row.LockedBy is null);
+        DeliveryQueueItem freed = await Eventually(() => h.Row(dead), row => row.LockedBy is null);
 
-        Assert.That(Harness.Unstamped(freed), Is.EqualTo(Harness.Unstamped(dead.Free())));
+        Assert.That(Harness.Unstamped(freed), Is.EqualTo(Harness.Unstamped(dead.FreeLock())));
         Assert.That((await h.Hosts()).Select(x => x.Id), Is.EqualTo([Host1]));
 
         await heartbeat.StopAsync(CancellationToken.None);
@@ -543,17 +543,17 @@ internal sealed class EventProcessorTests
     public async Task HeartbeatStop_ShouldReleaseTheRowsThisHostOwnsAndForgetTheHost()
     {
         using var h = new Harness();
-        await h.Seed(new EventHost(Host2, Now));
-        EventDelivery withWorker = await h.Seed(h.Free().Reserve(Host1));
-        EventDelivery retry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddMinutes(1)));
-        EventDelivery other = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2));
+        await h.Seed(new EventProcessor(Host2, Now));
+        DeliveryQueueItem withWorker = await h.Seed(h.Free().Reserve(Host1));
+        DeliveryQueueItem retry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddMinutes(1)));
+        DeliveryQueueItem other = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2));
         EventHeartbeat<ShopContext> heartbeat = h.BuildHeartbeat();
 
         await heartbeat.StartAsync(CancellationToken.None);
         await heartbeat.StopAsync(CancellationToken.None);
 
-        Assert.That(Harness.Unstamped(await h.Row(withWorker)), Is.EqualTo(Harness.Unstamped(withWorker.Free())));
-        Assert.That(Harness.Unstamped(await h.Row(retry)), Is.EqualTo(Harness.Unstamped(retry.Free())), "a retry keeps its time, any host may run it then");
+        Assert.That(Harness.Unstamped(await h.Row(withWorker)), Is.EqualTo(Harness.Unstamped(withWorker.FreeLock())));
+        Assert.That(Harness.Unstamped(await h.Row(retry)), Is.EqualTo(Harness.Unstamped(retry.FreeLock())), "a retry keeps its time, any host may run it then");
         Assert.That(await h.Row(other), Is.EqualTo(other));
         Assert.That((await h.Hosts()).Select(x => x.Id), Is.EqualTo([Host2]));
     }
@@ -570,7 +570,7 @@ internal sealed class EventProcessorTests
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
         }));
         h.Db.Channel.Writer.TryWrite(await h.Seed());
-        EventDelivery queued = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1));
+        DeliveryQueueItem queued = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1));
 
         EventHeartbeat<ShopContext> heartbeat = h.BuildHeartbeat();
         await heartbeat.StartAsync(CancellationToken.None);
@@ -581,8 +581,8 @@ internal sealed class EventProcessorTests
 
         Assert.That((await h.Queue()).Select(r => (r.EventId, r.LockedBy, r.Attempts)), Is.EquivalentTo(new[]
         {
-            (h.Envelope.Id, (HostId?)null, 1),
-            (queued.EventId, (HostId?)null, 1),
+            (h.Envelope.Id, (InstanceId?)null, 1),
+            (queued.EventId, (InstanceId?)null, 1),
         }));
         Assert.That(await h.Hosts(), Is.Empty);
     }

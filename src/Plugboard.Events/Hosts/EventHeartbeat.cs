@@ -8,13 +8,13 @@ namespace Plugboard.Events;
 /// <summary>Writes this host's heartbeat and frees the deliveries of every owner without a live one.</summary>
 internal sealed partial class EventHeartbeat<TContext>(
     IDbContextFactory<TContext> contexts,
-    IOptions<EventProcessorOptions> options,
+    IOptions<PlugboardEventsOptions> options,
     TimeProvider time,
     ILogger<EventHeartbeat<TContext>> logger) : BackgroundService
     where TContext : DbContext, IEventStoreContext
 {
-    private readonly EventProcessorOptions _options = options.Value;
-    private readonly HostId _host = new(options.Value.Host);
+    private readonly PlugboardEventsOptions _options = options.Value;
+    private readonly InstanceId _instance = InstanceId.Current;
 
     /// <inheritdoc/>
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -35,7 +35,7 @@ internal sealed partial class EventHeartbeat<TContext>(
         }
         catch (Exception exception)
         {
-            LogReleaseFailed(exception, _host, _options.HostTimeout);
+            LogReleaseFailed(exception, _instance, _options.HostTimeout);
         }
     }
 
@@ -53,7 +53,7 @@ internal sealed partial class EventHeartbeat<TContext>(
             }
             catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
             {
-                LogHeartbeatFailed(exception, _host, _options.HostTimeout);
+                LogHeartbeatFailed(exception, _instance, _options.HostTimeout);
             }
         }
     }
@@ -64,14 +64,14 @@ internal sealed partial class EventHeartbeat<TContext>(
         DateTimeOffset now = time.GetUtcNow();
         await using TContext context = await contexts.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        int seen = await context.EventHosts
-            .Where(h => h.Id == _host)
+        int seen = await context.EventProcessors
+            .Where(h => h.Id == _instance)
             .ExecuteUpdateAsync(setters => setters.SetProperty(h => h.LastSeen, now), cancellationToken)
             .ConfigureAwait(false);
 
         if (seen == 0)
         {
-            context.EventHosts.Add(new EventHost(_host, now));
+            context.EventProcessors.Add(new EventProcessor { Id = _instance, LastSeen = now });
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
     }
@@ -83,15 +83,14 @@ internal sealed partial class EventHeartbeat<TContext>(
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using TContext context = await contexts.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        int freed = await context.Deliveries
-            .Where(d => d.LockedBy != null && !context.EventHosts.Any(h => h.Id == d.LockedBy && h.LastSeen >= seenSince))
+        int freed = await context.DeliveryQueue
+            .Where(d => d.LockedBy != null && !context.EventProcessors.Any(h => h.Id == d.LockedBy && h.LastSeen >= seenSince))
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(d => d.LockedBy, (HostId?)null)
-                .SetProperty(d => d.UpdatedAt, now)
-                .SetProperty(d => d.Version, d => d.Version + 1), cancellationToken)
+                .SetProperty(d => d.LockedBy, (InstanceId?)null)
+                .SetProperty(d => d.UpdatedAt, now), cancellationToken)
             .ConfigureAwait(false);
 
-        await context.EventHosts
+        await context.EventProcessors
             .Where(h => h.LastSeen < seenSince)
             .ExecuteDeleteAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -108,27 +107,26 @@ internal sealed partial class EventHeartbeat<TContext>(
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using TContext context = await contexts.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
-        await context.Deliveries
-            .Where(d => d.LockedBy == _host)
+        await context.DeliveryQueue
+            .Where(d => d.LockedBy == _instance)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(d => d.LockedBy, (HostId?)null)
-                .SetProperty(d => d.UpdatedAt, now)
-                .SetProperty(d => d.Version, d => d.Version + 1), cancellationToken)
+                .SetProperty(d => d.LockedBy, (InstanceId?)null)
+                .SetProperty(d => d.UpdatedAt, now), cancellationToken)
             .ConfigureAwait(false);
 
-        await context.EventHosts
-            .Where(h => h.Id == _host)
+        await context.EventProcessors
+            .Where(h => h.Id == _instance)
             .ExecuteDeleteAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 
     [LoggerMessage(Level = LogLevel.Error,
         Message = "Could not write the heartbeat of host {Host}; if this keeps failing for {HostTimeout} the other hosts free its deliveries")]
-    private partial void LogHeartbeatFailed(Exception exception, HostId host, TimeSpan hostTimeout);
+    private partial void LogHeartbeatFailed(Exception exception, InstanceId instance, TimeSpan hostTimeout);
 
     [LoggerMessage(Level = LogLevel.Error,
         Message = "Releasing the deliveries of host {Host} on shutdown failed; they free up after {HostTimeout}")]
-    private partial void LogReleaseFailed(Exception exception, HostId host, TimeSpan hostTimeout);
+    private partial void LogReleaseFailed(Exception exception, InstanceId instance, TimeSpan hostTimeout);
 
     [LoggerMessage(Level = LogLevel.Information,
         Message = "Freed {Freed} deliveries of hosts without a live heartbeat")]

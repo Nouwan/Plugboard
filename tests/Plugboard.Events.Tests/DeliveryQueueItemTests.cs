@@ -3,12 +3,12 @@ using NUnit.Framework;
 namespace Plugboard.Events.Tests;
 
 [TestFixture]
-internal sealed class EventDeliveryTests
+internal sealed class DeliveryQueueItemTests
 {
-    private static readonly HostId Host1 = new("host-1");
+    private static readonly InstanceId Host1 = new("host-1");
     private static readonly DateTimeOffset Now = new(2026, 10, 23, 12, 0, 0, TimeSpan.Zero);
 
-    private static readonly EventDelivery Free = new() { EventId = Guid.NewGuid(), Subscription = "send-confirmation" };
+    private static readonly DeliveryQueueItem Free = new() { EventId = Guid.NewGuid(), Subscription = "send-confirmation" };
 
     [Test]
     public void Reserve_ShouldNameTheHostDropTheNotBeforeAndCountTheAttempt() =>
@@ -26,12 +26,12 @@ internal sealed class EventDeliveryTests
 
     [Test]
     public void Free_ShouldDropTheHostAndKeepTheAttempts() =>
-        AssertStamped(Free.Reserve(Host1).Defer(Now).Reserve(Host1).Free(), Free with { Attempts = 2, NotBefore = null, Version = 4 });
+        AssertStamped(Free.Reserve(Host1).Defer(Now).Reserve(Host1).FreeLock(), Free with { Attempts = 2, NotBefore = null, Version = 4 });
 
     [Test]
     public void Finished_ShouldCarryTheIdentityAndTheAttempts()
     {
-        EventDelivery reserved = Free.Reserve(Host1);
+        DeliveryQueueItem reserved = Free.Reserve(Host1);
 
         DeliveryHistory finished = reserved.Finished();
 
@@ -42,7 +42,7 @@ internal sealed class EventDeliveryTests
     [Test]
     public void DeadLettered_ShouldCarryTheIdentityTheAttemptsAndTheException()
     {
-        EventDelivery reserved = Free.Reserve(Host1);
+        DeliveryQueueItem reserved = Free.Reserve(Host1);
 
         DeadLetter deadLetter = reserved.DeadLettered(new InvalidOperationException("boom"));
 
@@ -59,7 +59,7 @@ internal sealed class EventDeliveryTests
     }
 
     /// <summary>The transition stamped the row with the current time and changed nothing else than expected.</summary>
-    private static void AssertStamped(EventDelivery actual, EventDelivery expected)
+    private static void AssertStamped(DeliveryQueueItem actual, DeliveryQueueItem expected)
     {
         Assert.That(actual.UpdatedAt, Is.EqualTo(DateTimeOffset.UtcNow).Within(TimeSpan.FromSeconds(5)));
         Assert.That(actual, Is.EqualTo(expected with { UpdatedAt = actual.UpdatedAt }));

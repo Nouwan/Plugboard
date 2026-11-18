@@ -14,6 +14,15 @@ public static class SubscriptionServiceCollectionExtensions
 
         foreach (Subscription subscription in builder.Build())
         {
+            bool taken = services.Any(d => d.ImplementationInstance is Subscription existing
+                && string.Equals(existing.Name, subscription.Name, StringComparison.Ordinal));
+
+            if (taken)
+            {
+                throw new InvalidOperationException(
+                    $"Subscription '{subscription.Name}' is registered more than once on this host; names are the delivery key and must be unique across modules.");
+            }
+
             services.AddSingleton(subscription);
         }
 
@@ -26,17 +35,11 @@ public sealed class SubscriptionBuilder
 {
     private readonly List<Subscription> _handlers = [];
 
-    internal SubscriptionBuilder()
-    {
-    }
+    internal SubscriptionBuilder() { }
 
-    /// <summary>Subscribes <paramref name="handler"/> to the event of its first parameter.</summary>
+    /// <summary>Subscribes <paramref name="subscriber"/> to event types of its first parameter.</summary>
     [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The call is rewritten by the generator and needs the instance.")]
-    public Subscription Subscribe(string name, Delegate handler) => throw NotIntercepted(name);
-
-    /// <summary>Subscribes <paramref name="handler"/> to every event.</summary>
-    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The call is rewritten by the generator and needs the instance.")]
-    public Subscription SubscribeAll(string name, Delegate handler) => throw NotIntercepted(name);
+    public Subscription Subscribe(string name, Delegate subscriber) => throw NotIntercepted(name);
 
     internal Subscription[] Build()
     {
@@ -57,7 +60,7 @@ public sealed class SubscriptionBuilder
     }
 
     private static InvalidOperationException NotIntercepted(string name) => new(
-        $"Event handler '{name}' was subscribed with Subscribe(...) or SubscribeAll(...) but the call was not rewritten at compile time. " +
+        $"Event subscriber '{name}' was subscribed with Subscribe(...) but the call was not rewritten at compile time. " +
         "Plugboard.Events generates the typed registration; make sure the package reference is present and the " +
         "Plugboard.Events.Generated namespace is listed in InterceptorsNamespaces (the package's build targets do this).");
 }

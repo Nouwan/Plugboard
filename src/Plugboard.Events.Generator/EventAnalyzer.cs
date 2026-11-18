@@ -77,7 +77,7 @@ public sealed class EventAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (call.Handler is null || DescribeHandler(call.Handler, call.All) is null)
+        if (call.Handler is null || DescribeHandler(call.Handler) is null)
         {
             context.ReportDiagnostic(Diagnostic.Create(InvalidHandler, call.HandlerArgument.GetLocation()));
         }

@@ -10,6 +10,6 @@ public static class EventContextExtensions
     /// its subscriptions. For code with no entity of its own to raise on.
     /// </summary>
     public static void Publish<TContext, TEvent>(this TContext context, TEvent integrationEvent)
-        where TContext : DbContext, IEventContext =>
+        where TContext : DbContext, IPublishingContext =>
         context.Events.Add(EventEnvelope.Create(integrationEvent));
 }

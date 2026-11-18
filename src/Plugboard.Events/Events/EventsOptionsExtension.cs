@@ -68,7 +68,7 @@ internal sealed class EventsOptionsExtension(bool owner) : IDbContextOptionsExte
     /// <summary>Marks the event tables excluded from migrations once the model is complete.</summary>
     private sealed class ExcludeEventTablesFromMigrations : IConventionSetPlugin, IModelFinalizingConvention
     {
-        private static readonly Type[] EventTypes = [typeof(EventEnvelope), typeof(EventDelivery), typeof(DeliveryHistory), typeof(DeadLetter), typeof(EventHost)];
+        private static readonly Type[] EventTypes = [typeof(EventEnvelope), typeof(DeliveryQueueItem), typeof(DeliveryHistory), typeof(DeadLetter), typeof(EventProcessor)];
 
         public ConventionSet ModifyConventions(ConventionSet conventionSet)
         {

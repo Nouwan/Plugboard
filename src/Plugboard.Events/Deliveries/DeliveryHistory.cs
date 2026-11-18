@@ -3,40 +3,45 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Plugboard.Events;
 
-/// <summary>A delivery whose handler completed.</summary>
+/// <summary>A successful handled delivery.</summary>
 [EntityTypeConfiguration(typeof(DeliveryHistoryConfiguration))]
 public sealed record DeliveryHistory
 {
-    /// <summary>The id the delivery had in the queue.</summary>
-    public required Guid Id { get; init; }
+    private DeliveryHistory(Guid id, Guid eventId, string subscription, int attempts, DateTimeOffset finishedAt)
+    {
+        Id = id;
+        EventId = eventId;
+        Subscription = subscription;
+        Attempts = attempts;
+        FinishedAt = finishedAt;
+    }
 
-    /// <summary>The stored event that was delivered.</summary>
-    public required Guid EventId { get; init; }
+    public  Guid Id { get; }
+    public  Guid EventId { get; }
+    public  string Subscription { get; }
+    public int Attempts { get;  }
+    public DateTimeOffset FinishedAt { get; }
+    public required EventEnvelope Event { get; init; }
 
-    /// <summary>The subscription name.</summary>
-    public required string Subscription { get; init; }
-
-    /// <summary>The event that was delivered.</summary>
-    public EventEnvelope Event { get; init; } = null!;
-
-    /// <summary>How many times the delivery was handed to a worker.</summary>
-    public int Attempts { get; init; }
-
-    /// <summary>When the handler completed.</summary>
-    public DateTimeOffset FinishedAt { get; init; }
+    public static DeliveryHistory Create(DeliveryQueueItem item)
+    {
+        return new DeliveryHistory(item.Id, item.EventId, item.Subscription, item.Attempts, DateTimeOffset.UtcNow)
+        {
+            Event = item.Event,
+        };
+    }
 }
 
-/// <summary>Maps the finished deliveries.</summary>
 internal sealed class DeliveryHistoryConfiguration : IEntityTypeConfiguration<DeliveryHistory>
 {
     /// <inheritdoc/>
     public void Configure(EntityTypeBuilder<DeliveryHistory> builder)
     {
         builder.ToTable(EventTables.DeliveryHistory);
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Id).ValueGeneratedNever();
-        builder.Property(x => x.Subscription).HasMaxLength(200);
-        builder.HasOne(x => x.Event).WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(x => x.FinishedAt);
+        builder.HasKey(history => history.Id);
+        builder.Property(history => history.Id).ValueGeneratedNever();
+        builder.Property(history => history.Subscription).HasMaxLength(200);
+        builder.HasOne(history => history.Event).WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(history => history.FinishedAt);
     }
 }

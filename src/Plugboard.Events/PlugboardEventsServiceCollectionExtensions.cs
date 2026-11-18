@@ -11,16 +11,14 @@ namespace Plugboard.Events;
 public static class PlugboardEventsServiceCollectionExtensions
 {
     /// <summary>Adds the event system on the context that owns the event tables: its migrations create them and the processor runs on it.</summary>
-    public static IServiceCollection AddPlugboardEvents<TContext>(this IServiceCollection services, Action<EventProcessorOptions>? configure = null)
+    public static IServiceCollection AddPlugboardEvents<TContext>(this IServiceCollection services, Action<PlugboardEventsOptions>? configure = null)
         where TContext : DbContext, IEventStoreContext
     {
-        services.AddOptions<EventProcessorOptions>()
-            .Validate(static o => !string.IsNullOrWhiteSpace(o.Host), "Host must be set.")
+        services.AddOptions<PlugboardEventsOptions>()
             .Validate(static o => o.SweepInterval > TimeSpan.Zero, "SweepInterval must be positive.")
             .Validate(static o => o.HostTimeout > TimeSpan.Zero, "HostTimeout must be positive.")
             .Validate(static o => o.Concurrency > 0, "Concurrency must be positive.")
             .Validate(static o => o.ChannelCapacity > 0, "ChannelCapacity must be positive.")
-            .Validate(static o => o.Backoff is not null, "Backoff must be set.")
             .ValidateOnStart();
 
         if (configure is not null)
@@ -30,7 +28,7 @@ public static class PlugboardEventsServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton(new EventStore(typeof(TContext)));
-        services.TryAddSingleton(static sp => Channel.CreateBounded<EventDelivery>(new BoundedChannelOptions(sp.GetRequiredService<IOptions<EventProcessorOptions>>().Value.ChannelCapacity)
+        services.TryAddSingleton(static sp => Channel.CreateBounded<DeliveryQueueItem>(new BoundedChannelOptions(sp.GetRequiredService<IOptions<PlugboardEventsOptions>>().Value.ChannelCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
         }));
@@ -45,11 +43,11 @@ public static class PlugboardEventsServiceCollectionExtensions
     /// <summary>
     /// Hands the events <typeparamref name="TContext"/> saves to this host's workers once they are committed, and keeps
     /// the event tables out of its migrations unless it is the context given to <see cref="AddPlugboardEvents{TContext}"/>.
-    /// Called by the generated registration for every <see cref="IEventContext"/> in a module; registering a context
+    /// Called by the generated registration for every <see cref="IPublishingContext"/> in a module; registering a context
     /// twice attaches it once.
     /// </summary>
     public static IServiceCollection AddEventContext<TContext>(this IServiceCollection services)
-        where TContext : DbContext, IEventContext
+        where TContext : DbContext, IPublishingContext
     {
         services.TryAddSingleton<EventContextInterceptor>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDbContextOptionsConfiguration<TContext>, EventContextConfiguration<TContext>>());

@@ -1,11 +1,8 @@
 namespace Plugboard.Events;
 
-/// <summary>Tuning of the sweeper and the processor.</summary>
-public sealed class EventProcessorOptions
+/// <summary>Configuration of plugboard events</summary>
+public sealed class PlugboardEventsOptions
 {
-    /// <summary>The name this host locks deliveries and heartbeats under.</summary>
-    public string Host { get; set; } = $"{Environment.MachineName}/{Guid.NewGuid():N}";
-
     /// <summary>How often this host sweeps the queue for due deliveries nobody owns.</summary>
     public TimeSpan SweepInterval { get; set; } = TimeSpan.FromSeconds(30);
 
@@ -16,9 +13,5 @@ public sealed class EventProcessorOptions
     public int Concurrency { get; set; } = 8;
 
     /// <summary>How many deliveries the in-process channel holds before saving events waits for room.</summary>
-    public int ChannelCapacity { get; set; } = 10_000;
-
-    /// <summary>The wait before retry number <c>n</c>.</summary>
-    public Func<int, TimeSpan> Backoff { get; set; } = static attempt =>
-        TimeSpan.FromMinutes(Math.Min(60, Math.Pow(2, attempt - 1)));
+    public int ChannelCapacity { get; set; } = 1_000;
 }

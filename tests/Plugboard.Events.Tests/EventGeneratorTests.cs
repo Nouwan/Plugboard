@@ -85,7 +85,7 @@ internal sealed class EventGeneratorTests
                 {
                     [Subscribe]
                     public static void Subscriptions(SubscriptionBuilder events) =>
-                        events.Subscribe("send-confirmation", (OrderPlaced e, IMailer mailer, HandlerContext ctx, CancellationToken ct) => Task.CompletedTask);
+                        events.Subscribe("send-confirmation", (OrderPlaced e, IMailer mailer, SubscriptionContext ctx, CancellationToken ct) => Task.CompletedTask);
                 }
             }
             """);
@@ -96,7 +96,7 @@ internal sealed class EventGeneratorTests
             [global::System.Runtime.CompilerServices.InterceptsLocation(1, "<location>")]
             public static Subscription Subscribe0(this SubscriptionBuilder events, string name, global::System.Delegate handler)
             {
-                var typed = (global::System.Func<global::TestProject.Orders.OrderPlaced, global::TestProject.Orders.IMailer, global::Plugboard.Events.HandlerContext, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task>)handler;
+                var typed = (global::System.Func<global::TestProject.Orders.OrderPlaced, global::TestProject.Orders.IMailer, global::Plugboard.Events.SubscriptionContext, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task>)handler;
                 return global::Plugboard.Events.SubscriptionServices.Register<global::TestProject.Orders.OrderPlaced>(events, name, (e, ctx, sp, ct) => typed(e, sp.GetRequiredService<global::TestProject.Orders.IMailer>(), ctx, ct));
             }
             """.ReplaceLineEndings("\n")));
@@ -124,40 +124,6 @@ internal sealed class EventGeneratorTests
     }
 
     [Test]
-    public async Task Generate_WithEnvelopeHandlerMaxDurationAndMethodGroup_ShouldRewriteIntoRegisterAll()
-    {
-        GeneratorRun run = await Generate(OrderPlacedEvent + """
-            namespace TestProject.Audit
-            {
-                using System;
-                using System.Threading;
-                using System.Threading.Tasks;
-                using Plugboard.Events;
-
-                public sealed class AuditDbContext;
-
-                public static class AuditHandlers
-                {
-                    [Subscribe]
-                    internal static void Subscriptions(SubscriptionBuilder events) =>
-                        events.SubscribeAll("audit", Audit).WithMaxDuration(TimeSpan.FromSeconds(90));
-
-                    private static Task Audit(EventEnvelope envelope, AuditDbContext db, CancellationToken ct) => Task.CompletedTask;
-                }
-            }
-            """);
-
-        Assert.That(run.Interceptors, Is.EqualTo("""
-            [global::System.Runtime.CompilerServices.InterceptsLocation(1, "<location>")]
-            public static Subscription SubscribeAll0(this SubscriptionBuilder events, string name, global::System.Delegate handler)
-            {
-                var typed = (global::System.Func<global::Plugboard.Events.EventEnvelope, global::TestProject.Audit.AuditDbContext, global::System.Threading.CancellationToken, global::System.Threading.Tasks.Task>)handler;
-                return global::Plugboard.Events.SubscriptionServices.RegisterAll(events, name, (e, ctx, sp, ct) => typed(e, sp.GetRequiredService<global::TestProject.Audit.AuditDbContext>(), ct));
-            }
-            """.ReplaceLineEndings("\n")));
-    }
-
-    [Test]
     public async Task Generate_WithResultReturningHandler_ShouldPassResultThrough()
     {
         GeneratorRun run = await Generate(OrderPlacedEvent + """
@@ -171,7 +137,7 @@ internal sealed class EventGeneratorTests
                 {
                     [Subscribe]
                     public static void Subscriptions(SubscriptionBuilder events) =>
-                        events.Subscribe("wait-for-stock", (OrderPlaced e, HandlerContext ctx) =>
+                        events.Subscribe("wait-for-stock", (OrderPlaced e, SubscriptionContext ctx) =>
                         {
                             ctx.Postpone(TimeSpan.FromMinutes(1));
                             return Task.CompletedTask;
@@ -184,7 +150,7 @@ internal sealed class EventGeneratorTests
             [global::System.Runtime.CompilerServices.InterceptsLocation(1, "<location>")]
             public static Subscription Subscribe0(this SubscriptionBuilder events, string name, global::System.Delegate handler)
             {
-                var typed = (global::System.Func<global::TestProject.Orders.OrderPlaced, global::Plugboard.Events.HandlerContext, global::System.Threading.Tasks.Task>)handler;
+                var typed = (global::System.Func<global::TestProject.Orders.OrderPlaced, global::Plugboard.Events.SubscriptionContext, global::System.Threading.Tasks.Task>)handler;
                 return global::Plugboard.Events.SubscriptionServices.Register<global::TestProject.Orders.OrderPlaced>(events, name, (e, ctx, sp, ct) => typed(e, ctx));
             }
             """.ReplaceLineEndings("\n")));

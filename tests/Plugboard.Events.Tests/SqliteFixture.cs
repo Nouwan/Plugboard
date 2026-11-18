@@ -18,7 +18,7 @@ internal sealed class SqliteFixture : IDisposable, IDbContextFactory<ShopContext
 
     public SqliteFixture(Action<SubscriptionBuilder>? subscribe = null, int channelCapacity = 100)
     {
-        Channel = System.Threading.Channels.Channel.CreateBounded<EventDelivery>(channelCapacity);
+        Channel = System.Threading.Channels.Channel.CreateBounded<DeliveryQueueItem>(channelCapacity);
         _connection.Open();
         var builder = new SubscriptionBuilder();
         subscribe?.Invoke(builder);
@@ -30,15 +30,15 @@ internal sealed class SqliteFixture : IDisposable, IDbContextFactory<ShopContext
 
         // A second module's context sharing the database: it maps the event tables without migrating them, so
         // creating its tables must only add its own.
-        using BillingContext billing = CreateBillingContext();
-        billing.GetService<IRelationalDatabaseCreator>().CreateTables();
+        using BillingPublishingContext billingPublishing = CreateBillingContext();
+        billingPublishing.GetService<IRelationalDatabaseCreator>().CreateTables();
     }
 
-    public Channel<EventDelivery> Channel { get; }
+    public Channel<DeliveryQueueItem> Channel { get; }
 
     public Subscription[] Subscriptions { get; }
 
-    public IOptions<EventProcessorOptions> Options { get; } = Microsoft.Extensions.Options.Options.Create(new EventProcessorOptions { Host = "host-1" });
+    public IOptions<PlugboardEventsOptions> Options { get; } = Microsoft.Extensions.Options.Options.Create(new PlugboardEventsOptions { Host = "host-1" });
 
     /// <summary>A context as the request scope would get it.</summary>
     public ShopContext CreateScopedContext() => new(ContextOptions().Options);
@@ -56,13 +56,13 @@ internal sealed class SqliteFixture : IDisposable, IDbContextFactory<ShopContext
     public ShopContext CreateSeedContext() => new(new DbContextOptionsBuilder<ShopContext>().UseSqlite(_connection).Options);
 
     /// <summary>Another module's context on the same database: it maps the event tables without owning them.</summary>
-    public BillingContext CreateBillingContext() => new(new DbContextOptionsBuilder<BillingContext>().UseSqlite(_connection).UsePlugboardEvents(_interceptor, owner: false).Options);
+    public BillingPublishingContext CreateBillingContext() => new(new DbContextOptionsBuilder<BillingPublishingContext>().UseSqlite(_connection).UsePlugboardEvents(_interceptor, owner: false).Options);
 
-    public List<EventDelivery> Published()
+    public List<DeliveryQueueItem> Published()
     {
-        var offered = new List<EventDelivery>();
+        var offered = new List<DeliveryQueueItem>();
 
-        while (Channel.Reader.TryRead(out EventDelivery? delivery))
+        while (Channel.Reader.TryRead(out DeliveryQueueItem? delivery))
         {
             offered.Add(delivery);
         }
@@ -82,13 +82,13 @@ internal sealed class ShopContext(DbContextOptions<ShopContext> options) : DbCon
 
     public DbSet<EventEnvelope> Events => Set<EventEnvelope>();
 
-    public DbSet<EventDelivery> Deliveries => Set<EventDelivery>();
+    public DbSet<DeliveryQueueItem> DeliveryQueue => Set<DeliveryQueueItem>();
 
     public DbSet<DeliveryHistory> DeliveryHistory => Set<DeliveryHistory>();
 
     public DbSet<DeadLetter> DeadLetters => Set<DeadLetter>();
 
-    public DbSet<EventHost> EventHosts => Set<EventHost>();
+    public DbSet<EventProcessor> EventProcessors => Set<EventProcessor>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,13 +98,13 @@ internal sealed class ShopContext(DbContextOptions<ShopContext> options) : DbCon
 }
 
 /// <summary>Another module's context: it publishes, so it maps the events and the queue.</summary>
-internal sealed class BillingContext(DbContextOptions<BillingContext> options) : DbContext(options), IEventContext
+internal sealed class BillingPublishingContext(DbContextOptions<BillingPublishingContext> options) : DbContext(options), IPublishingContext
 {
     public DbSet<Invoice> Invoices => Set<Invoice>();
 
     public DbSet<EventEnvelope> Events => Set<EventEnvelope>();
 
-    public DbSet<EventDelivery> Deliveries => Set<EventDelivery>();
+    public DbSet<DeliveryQueueItem> Deliveries => Set<DeliveryQueueItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

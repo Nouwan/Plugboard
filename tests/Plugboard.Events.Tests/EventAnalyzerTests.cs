@@ -34,11 +34,8 @@ internal sealed class EventAnalyzerTests
             public static void Subscriptions(SubscriptionBuilder events)
             {
                 events.Subscribe("send-confirmation", (OrderPlaced e, IMailer mailer, CancellationToken ct) => Task.CompletedTask);
-                events.Subscribe("update-stock", (OrderPlaced e, HandlerContext ctx) => Task.CompletedTask).WithMaxDuration(TimeSpan.FromSeconds(90));
-                events.SubscribeAll("audit", Audit);
+                events.Subscribe("update-stock", (OrderPlaced e, SubscriptionContext ctx) => Task.CompletedTask).WithMaxDuration(TimeSpan.FromSeconds(90));
             }
-
-            private static Task Audit(EventEnvelope envelope, CancellationToken ct) => Task.CompletedTask;
         }
 
         public static class Other
@@ -117,16 +114,6 @@ internal sealed class EventAnalyzerTests
         """);
 
     [Test]
-    public Task Analyze_WithEventInSubscribeAll_ShouldReportPB205() => Analyze(Usings + OrderPlacedEvent + """
-        public static class OrderHandlers
-        {
-            [Subscribe]
-            public static void Subscriptions(SubscriptionBuilder events) =>
-                events.SubscribeAll("broken", {|PB205:(OrderPlaced e) => Task.CompletedTask|});
-        }
-        """);
-
-    [Test]
     public Task Analyze_WithUnmarkedEventParameter_ShouldReportPB205() => Analyze(Usings + """
         public sealed record NotAnEvent(int Id);
 
@@ -154,7 +141,7 @@ internal sealed class EventAnalyzerTests
         {
             [Subscribe]
             public static void Subscriptions(SubscriptionBuilder events) =>
-                events.Subscribe("broken", {|PB205:(OrderPlaced e, HandlerContext a, HandlerContext b) => Task.CompletedTask|});
+                events.Subscribe("broken", {|PB205:(OrderPlaced e, SubscriptionContext a, SubscriptionContext b) => Task.CompletedTask|});
         }
         """);
 
