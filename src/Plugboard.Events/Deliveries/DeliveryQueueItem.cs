@@ -67,7 +67,8 @@ internal sealed class DeliveryQueueItemConfiguration : IEntityTypeConfiguration<
         builder.Property(item => item.Id).ValueGeneratedNever();
         builder.Property(item => item.Subscription).HasMaxLength(200);
         builder.Property(item => item.LockedBy).HasConversion(InstanceId.Converter).HasMaxLength(200).IsConcurrencyToken();
-        builder.Property(item => item.UpdatedAt).IsRequired().IsConcurrencyToken();
+        builder.Property(item => item.Attempts).IsConcurrencyToken();
+        builder.Property(item => item.UpdatedAt).IsRequired();
         builder.HasOne(item => item.Event).WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(item => new { item.EventId, item.Subscription }).IsUnique();
         builder.HasIndex(item => new { item.LockedBy, item.NotBefore });

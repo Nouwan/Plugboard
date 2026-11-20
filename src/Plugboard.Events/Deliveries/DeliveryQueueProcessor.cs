@@ -8,10 +8,10 @@ using Microsoft.Extensions.Options;
 namespace Plugboard.Events;
 
 /// <summary>Runs the deliveries published on the channel and writes their outcomes back.</summary>
-internal sealed partial class EventProcessor<TContext>(
+internal sealed partial class DeliveryQueueProcessor<TContext>(
     IDbContextFactory<TContext> contextFactory,
     Channel<DeliveryQueueItem> channel,
-    ILogger<EventProcessor<TContext>> logger,
+    ILogger<DeliveryQueueProcessor<TContext>> logger,
     IEnumerable<Subscription> subscriptions,
     IServiceScopeFactory scopes,
     IOptions<PlugboardEventsOptions> options) : BackgroundService
@@ -36,22 +36,6 @@ internal sealed partial class EventProcessor<TContext>(
         }
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        Task[] workers = CreateAndStartWorkers(_options.Concurrency, stoppingToken);
-        Task first = await Task.WhenAny(workers).ConfigureAwait(false);
-
-        if (first.IsFaulted)
-        {
-            //Rethrows the exception that failed the task
-            await first.ConfigureAwait(false);
-        }
-
-        //If no exception has been thrown wait for the other workers to end before shutdown
-        await Task.WhenAll(workers).ConfigureAwait(false);
-    }
-
-
     private async Task DeliverAsync(DeliveryQueueItem delivery, CancellationToken stoppingToken)
     {
         await using TContext context = await contextFactory.CreateDbContextAsync(stoppingToken).ConfigureAwait(false);
@@ -72,7 +56,6 @@ internal sealed partial class EventProcessor<TContext>(
                 .ConfigureAwait(false);
             return;
         }
-
 
         using var timeLimit = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeLimit.CancelAfter(subscription.MaxDuration);
@@ -99,6 +82,21 @@ internal sealed partial class EventProcessor<TContext>(
         }
 
         await context.FinishAsync(delivery, stoppingToken).ConfigureAwait(false);
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        Task[] workers = CreateAndStartWorkers(_options.Concurrency, stoppingToken);
+        Task first = await Task.WhenAny(workers).ConfigureAwait(false);
+
+        if (first.IsFaulted)
+        {
+            //Rethrows the exception that failed the task
+            await first.ConfigureAwait(false);
+        }
+
+        //If no exception has been thrown wait for the other workers to end before shutdown
+        await Task.WhenAll(workers).ConfigureAwait(false);
     }
 
     [LoggerMessage(LogLevel.Information, "Event delivery with id {EventDeliveryId} ran")]

@@ -15,7 +15,7 @@ public interface IEventStoreContext
     DbSet<DeadLetter> DeadLetters { get; }
 
     /// <summary>The hosts running the processor and their last heartbeat.</summary>
-    DbSet<EventProcessor> EventProcessors { get; }
+    DbSet<ProcessorInstance> EventProcessors { get; }
 
     /// <summary>Published events</summary>
     DbSet<EventEnvelope> Events { get; }

@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Plugboard.Events;
 
-/// <summary>A host running the processor and its last heartbeat.</summary>
+/// <summary>A host running the processor</summary>
 [EntityTypeConfiguration(typeof(EventHostConfiguration))]
-public sealed class EventProcessor
+public sealed class ProcessorInstance
 {
     public InstanceId Id { get; internal init; }
     public DateTimeOffset LastSeen { get; internal init; }
@@ -31,9 +31,9 @@ public readonly record struct InstanceId
     internal static readonly InstanceId Current = new($"{Environment.MachineName}_{Guid.CreateVersion7():N}");
 }
 
-internal sealed class EventHostConfiguration : IEntityTypeConfiguration<EventProcessor>
+internal sealed class EventHostConfiguration : IEntityTypeConfiguration<ProcessorInstance>
 {
-    public void Configure(EntityTypeBuilder<EventProcessor> builder)
+    public void Configure(EntityTypeBuilder<ProcessorInstance> builder)
     {
         builder.ToTable(EventTables.Hosts);
         builder.HasKey(x => x.Id);

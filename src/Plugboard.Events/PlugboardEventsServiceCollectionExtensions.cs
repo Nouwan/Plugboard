@@ -34,9 +34,9 @@ public static class PlugboardEventsServiceCollectionExtensions
         }));
         // Started in this order and stopped in reverse: the host row exists before any row is reserved and outlives
         // the processor's release; the sweeper stops publishing before the processor stops reading.
-        services.AddHostedService<EventHeartbeat<TContext>>();
-        services.AddHostedService<EventProcessor<TContext>>();
-        services.AddHostedService<EventSweeper<TContext>>();
+        services.AddHostedService<InstanceHeartBeatService<TContext>>();
+        services.AddHostedService<DeliveryQueueProcessor<TContext>>();
+        services.AddHostedService<DeliveryQueueSweeper<TContext>>();
         return services.AddEventContext<TContext>();
     }
 

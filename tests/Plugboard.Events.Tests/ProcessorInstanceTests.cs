@@ -7,7 +7,7 @@ namespace Plugboard.Events.Tests;
 
 /// <summary>The processor, sweeper and heartbeat against the real tables, on SQLite.</summary>
 [TestFixture]
-internal sealed class EventProcessorTests
+internal sealed class ProcessorInstanceTests
 {
     private static readonly InstanceId Host1 = new("host-1");
     private static readonly InstanceId Host2 = new("host-2");
@@ -23,7 +23,7 @@ internal sealed class EventProcessorTests
 
     private sealed class Harness : IDisposable
     {
-        public SqliteFixture Db { get; } = new(channelCapacity: EventSweeper<ShopContext>.Limit * 3);
+        public SqliteFixture Db { get; } = new(channelCapacity: DeliveryQueueSweeper<ShopContext>.BatchSize * 3);
 
         public Mailer Mailer { get; } = new();
 
@@ -33,20 +33,20 @@ internal sealed class EventProcessorTests
 
         public EventEnvelope Envelope { get; } = EventEnvelope.Create(new OrderPlaced(42));
 
-        public EventProcessor<ShopContext> Build(Action<SubscriptionBuilder> subscribe)
+        public DeliveryQueueProcessor<ShopContext> Build(Action<SubscriptionBuilder> subscribe)
         {
             var builder = new SubscriptionBuilder();
             subscribe(builder);
             ServiceProvider services = new ServiceCollection().AddSingleton(Mailer).BuildServiceProvider();
-            return new EventProcessor<ShopContext>(Db, Db.Channel, builder.Build(), services.GetRequiredService<IServiceScopeFactory>(),
-                Time, Microsoft.Extensions.Options.Options.Create(Options), NullLogger<EventProcessor<ShopContext>>.Instance);
+            return new DeliveryQueueProcessor<ShopContext>(Db, Db.Channel, builder.Build(), services.GetRequiredService<IServiceScopeFactory>(),
+                Time, Microsoft.Extensions.Options.Options.Create(Options), NullLogger<DeliveryQueueProcessor<ShopContext>>.Instance);
         }
 
-        public EventSweeper<ShopContext> BuildSweeper(InstanceId? host = null) =>
-            new(Db, Db.Channel, Microsoft.Extensions.Options.Options.Create(host is null ? Options : new PlugboardEventsOptions { Host = host.Value.Value }), Time, NullLogger<EventSweeper<ShopContext>>.Instance);
+        public DeliveryQueueSweeper<ShopContext> BuildSweeper(InstanceId? host = null) =>
+            new(Db, Db.Channel, Microsoft.Extensions.Options.Options.Create(host is null ? Options : new PlugboardEventsOptions { Host = host.Value.Value }), Time, NullLogger<DeliveryQueueSweeper<ShopContext>>.Instance);
 
-        public EventHeartbeat<ShopContext> BuildHeartbeat() =>
-            new(Db, Microsoft.Extensions.Options.Options.Create(Options), Time, NullLogger<EventHeartbeat<ShopContext>>.Instance);
+        public InstanceHeartBeatService<ShopContext> BuildHeartbeat() =>
+            new(Db, Microsoft.Extensions.Options.Options.Create(Options), Time, NullLogger<InstanceHeartBeatService<ShopContext>>.Instance);
 
         /// <summary>Seeds one delivery of <see cref="Envelope"/> for send-confirmation, reserved for this host unless given.</summary>
         public async Task<DeliveryQueueItem> Seed(DeliveryQueueItem? delivery = null) =>
@@ -67,7 +67,7 @@ internal sealed class EventProcessorTests
             return deliveryQueueItem with { EventId = envelope.Id, Event = envelope };
         }
 
-        public async Task Seed(params EventProcessor[] hosts)
+        public async Task Seed(params ProcessorInstance[] hosts)
         {
             await using ShopContext context = Db.CreateDbContext();
             context.Instances.AddRange(hosts);
@@ -104,7 +104,7 @@ internal sealed class EventProcessorTests
 
         public static DeliveryQueueItem Unstamped(DeliveryQueueItem row) => row with { UpdatedAt = default };
 
-        public async Task<List<EventProcessor>> Hosts()
+        public async Task<List<ProcessorInstance>> Hosts()
         {
             await using ShopContext context = Db.CreateDbContext();
             return await context.Instances.AsNoTracking().OrderBy(h => h.Id).ToListAsync();
@@ -118,7 +118,7 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
         HandlerContext? seen = null;
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
         {
             seen = ctx;
             sp.GetRequiredService<Mailer>().Sent.Add(e.OrderId);
@@ -149,7 +149,7 @@ internal sealed class EventProcessorTests
     public async Task Process_WithPostponingHandler_ShouldStayQueuedUntilTheDelayPasses()
     {
         using var h = new Harness();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             (e, ctx, sp, ct) =>
             {
                 ctx.Postpone(TimeSpan.FromMinutes(5));
@@ -166,7 +166,7 @@ internal sealed class EventProcessorTests
     public async Task Process_WithThrowingHandler_ShouldScheduleRetryWithBackoff()
     {
         using var h = new Harness();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             (e, ctx, sp, ct) => throw new InvalidOperationException("mail server down")));
         DeliveryQueueItem reserved = await h.Seed();
 
@@ -179,7 +179,7 @@ internal sealed class EventProcessorTests
     public async Task Process_WithThrowingHandlerOnLastAttempt_ShouldDeadLetter()
     {
         using var h = new Harness();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             (e, ctx, sp, ct) => throw new InvalidOperationException("still down")).WithMaxAttempts(3));
         DeliveryQueueItem reserved = await h.Seed((h.Free() with { Attempts = 2 }).Reserve(Host1));
 
@@ -195,7 +195,7 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
         var invoked = false;
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
         {
             invoked = true;
             return Task.CompletedTask;
@@ -214,7 +214,7 @@ internal sealed class EventProcessorTests
     public async Task Process_WithUnknownSubscription_ShouldDeadLetter()
     {
         using var h = new Harness();
-        EventProcessor<ShopContext> processor = h.Build(_ => { });
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(_ => { });
 
         await processor.ProcessAsync(await h.Seed(), CancellationToken.None);
 
@@ -227,7 +227,7 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
         var invoked = false;
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
         {
             invoked = true;
             return Task.CompletedTask;
@@ -245,7 +245,7 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
         var invoked = 0;
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
         {
             invoked++;
             return Task.CompletedTask;
@@ -266,7 +266,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         var cancelled = new TaskCompletionSource();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             async (e, ctx, sp, ct) =>
             {
                 try
@@ -293,7 +293,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         var release = new TaskCompletionSource();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation",
             (e, ctx, sp, ct) => release.Task).WithMaxDuration(TimeSpan.FromMilliseconds(50)));
 
         Task<bool> processing = processor.ProcessAsync(await h.Seed(), CancellationToken.None);
@@ -307,7 +307,7 @@ internal sealed class EventProcessorTests
     public async Task Process_WhenTheRowWasTakenOverDuringTheRun_ShouldNotRecordTheOutcome()
     {
         using var h = new Harness();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", async (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", async (e, ctx, sp, ct) =>
         {
             // This host was taken for dead meanwhile: its row was freed and another host took it.
             await using ShopContext context = h.Db.CreateDbContext();
@@ -328,7 +328,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         var invoked = 0;
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
         {
             invoked++;
             h.Db.Outage.Unavailable = true; // The database goes away while the handler runs; the outcome write has to wait for it.
@@ -352,7 +352,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         var handled = new TaskCompletionSource();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) =>
         {
             handled.TrySetResult();
             return Task.CompletedTask;
@@ -445,13 +445,13 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         h.Options.SweepInterval = TimeSpan.FromMilliseconds(20);
-        EventSweeper<ShopContext> sweeper = h.BuildSweeper();
+        DeliveryQueueSweeper<ShopContext> queueSweeper = h.BuildSweeper();
 
-        await sweeper.StartAsync(CancellationToken.None);
+        await queueSweeper.StartAsync(CancellationToken.None);
         await Task.Delay(50); // The sweep at start found nothing; only a later sweep can find this one.
         DeliveryQueueItem due = await h.Seed(h.Free());
         DeliveryQueueItem published = await h.Db.Channel.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
-        await sweeper.StopAsync(CancellationToken.None);
+        await queueSweeper.StopAsync(CancellationToken.None);
 
         Assert.That(Harness.Unstamped(published), Is.EqualTo(Harness.Unstamped(due.Reserve(Host1))));
     }
@@ -461,14 +461,14 @@ internal sealed class EventProcessorTests
     {
         using var h = new Harness();
 
-        for (var i = 0; i < EventSweeper<ShopContext>.Limit * 2 + 1; i++)
+        for (var i = 0; i < DeliveryQueueSweeper<ShopContext>.BatchSize * 2 + 1; i++)
         {
             await h.Seed(Harness.AnotherEvent(), h.Free());
         }
 
         await h.BuildSweeper().SweepAsync(CancellationToken.None);
 
-        Assert.That(h.Db.Channel.Reader.Count, Is.EqualTo(EventSweeper<ShopContext>.Limit * 2 + 1));
+        Assert.That(h.Db.Channel.Reader.Count, Is.EqualTo(DeliveryQueueSweeper<ShopContext>.BatchSize * 2 + 1));
         Assert.That((await h.Queue()).All(r => r.LockedBy == Host1 && r.Attempts == 1), Is.True);
     }
 
@@ -478,7 +478,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Options.HostTimeout = TimeSpan.FromMinutes(5);
         var dead = new InstanceId("dead");
-        await h.Seed(new EventProcessor(dead, Now.AddMinutes(-10)));
+        await h.Seed(new ProcessorInstance(dead, Now.AddMinutes(-10)));
         DeliveryQueueItem retry = await h.Seed(h.Free().Reserve(dead).Defer(Now.AddMinutes(1)));
 
         await h.BuildHeartbeat().StartAsync(CancellationToken.None);
@@ -500,7 +500,7 @@ internal sealed class EventProcessorTests
         var alive = new InstanceId("alive");
         var stale = new InstanceId("stale");
         var unknown = new InstanceId("unknown");
-        await h.Seed(new EventProcessor(alive, Now.AddMinutes(-1)), new EventProcessor(stale, Now.AddMinutes(-10)));
+        await h.Seed(new ProcessorInstance(alive, Now.AddMinutes(-1)), new ProcessorInstance(stale, Now.AddMinutes(-10)));
         DeliveryQueueItem ofAlive = await h.Seed(h.Free().Reserve(alive));
         DeliveryQueueItem ofStale = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(stale));
         DeliveryQueueItem ofUnknown = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(unknown));
@@ -512,7 +512,7 @@ internal sealed class EventProcessorTests
         Assert.That(Harness.Unstamped(await h.Row(ofStale)), Is.EqualTo(Harness.Unstamped(ofStale.FreeLock())), "freed, the attempt it was handed out for still counts");
         Assert.That((await h.Row(ofUnknown)).LockedBy, Is.Null, "an owner without a heartbeat row is as dead as a stale one");
         Assert.That(await h.Row(free), Is.EqualTo(free));
-        Assert.That(await h.Hosts(), Is.EqualTo([new EventProcessor(alive, Now.AddMinutes(-1)), new EventProcessor(Host1, Now)]));
+        Assert.That(await h.Hosts(), Is.EqualTo([new ProcessorInstance(alive, Now.AddMinutes(-1)), new ProcessorInstance(Host1, Now)]));
     }
 
     [Test]
@@ -521,14 +521,14 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         h.Options.HostTimeout = TimeSpan.FromMilliseconds(60); // Beats every 10 ms.
-        EventHeartbeat<ShopContext> heartbeat = h.BuildHeartbeat();
+        InstanceHeartBeatService<ShopContext> heartbeat = h.BuildHeartbeat();
 
         await heartbeat.StartAsync(CancellationToken.None);
-        Assert.That(await h.Hosts(), Is.EqualTo([new EventProcessor(Host1, Now)]), "written before anything else starts");
+        Assert.That(await h.Hosts(), Is.EqualTo([new ProcessorInstance(Host1, Now)]), "written before anything else starts");
 
         // host-2 died with a delivery at a worker; its heartbeat is two minutes old, so only a later beat can free it.
         DeliveryQueueItem dead = await h.Seed(h.Free().Reserve(Host2));
-        await h.Seed(new EventProcessor(Host2, Now.AddMinutes(-2)));
+        await h.Seed(new ProcessorInstance(Host2, Now.AddMinutes(-2)));
 
         DeliveryQueueItem freed = await Eventually(() => h.Row(dead), row => row.LockedBy is null);
 
@@ -543,11 +543,11 @@ internal sealed class EventProcessorTests
     public async Task HeartbeatStop_ShouldReleaseTheRowsThisHostOwnsAndForgetTheHost()
     {
         using var h = new Harness();
-        await h.Seed(new EventProcessor(Host2, Now));
+        await h.Seed(new ProcessorInstance(Host2, Now));
         DeliveryQueueItem withWorker = await h.Seed(h.Free().Reserve(Host1));
         DeliveryQueueItem retry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddMinutes(1)));
         DeliveryQueueItem other = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2));
-        EventHeartbeat<ShopContext> heartbeat = h.BuildHeartbeat();
+        InstanceHeartBeatService<ShopContext> heartbeat = h.BuildHeartbeat();
 
         await heartbeat.StartAsync(CancellationToken.None);
         await heartbeat.StopAsync(CancellationToken.None);
@@ -564,7 +564,7 @@ internal sealed class EventProcessorTests
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
         var started = new TaskCompletionSource();
-        EventProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", async (e, ctx, sp, ct) =>
+        DeliveryQueueProcessor<ShopContext> processor = h.Build(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", async (e, ctx, sp, ct) =>
         {
             started.SetResult();
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
@@ -572,7 +572,7 @@ internal sealed class EventProcessorTests
         h.Db.Channel.Writer.TryWrite(await h.Seed());
         DeliveryQueueItem queued = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1));
 
-        EventHeartbeat<ShopContext> heartbeat = h.BuildHeartbeat();
+        InstanceHeartBeatService<ShopContext> heartbeat = h.BuildHeartbeat();
         await heartbeat.StartAsync(CancellationToken.None);
         await processor.StartAsync(CancellationToken.None);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));

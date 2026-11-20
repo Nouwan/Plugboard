@@ -84,7 +84,7 @@ internal sealed class EventPublisherTests
         using BillingPublishingContext billingPublishing = services.GetRequiredService<IDbContextFactory<BillingPublishingContext>>().CreateDbContext();
 
         Assert.That(services.GetServices<IHostedService>().Select(s => s.GetType().GetGenericTypeDefinition()),
-            Is.EqualTo([typeof(EventHeartbeat<>), typeof(EventProcessor<>), typeof(EventSweeper<>)]));
+            Is.EqualTo([typeof(InstanceHeartBeatService<>), typeof(DeliveryQueueProcessor<>), typeof(DeliveryQueueSweeper<>)]));
         Assert.That(Interceptors(shop).OfType<EventContextInterceptor>().Count(), Is.EqualTo(1));
         Assert.That(Interceptors(billingPublishing).OfType<EventContextInterceptor>().Count(), Is.EqualTo(1));
         Assert.That(shop.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(DeliveryQueueItem))!.IsTableExcludedFromMigrations(), Is.False, "the context that owns the tables migrates them");

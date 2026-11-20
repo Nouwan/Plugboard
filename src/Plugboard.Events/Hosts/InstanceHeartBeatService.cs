@@ -6,11 +6,11 @@ using Microsoft.Extensions.Options;
 namespace Plugboard.Events;
 
 /// <summary>Writes this host's heartbeat and frees the deliveries of every owner without a live one.</summary>
-internal sealed partial class EventHeartbeat<TContext>(
+internal sealed partial class InstanceHeartBeatService<TContext>(
     IDbContextFactory<TContext> contexts,
     IOptions<PlugboardEventsOptions> options,
     TimeProvider time,
-    ILogger<EventHeartbeat<TContext>> logger) : BackgroundService
+    ILogger<InstanceHeartBeatService<TContext>> logger) : BackgroundService
     where TContext : DbContext, IEventStoreContext
 {
     private readonly PlugboardEventsOptions _options = options.Value;
@@ -71,7 +71,7 @@ internal sealed partial class EventHeartbeat<TContext>(
 
         if (seen == 0)
         {
-            context.EventProcessors.Add(new EventProcessor { Id = _instance, LastSeen = now });
+            context.EventProcessors.Add(new ProcessorInstance { Id = _instance, LastSeen = now });
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
     }

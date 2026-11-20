@@ -88,7 +88,7 @@ internal sealed class ShopContext(DbContextOptions<ShopContext> options) : DbCon
 
     public DbSet<DeadLetter> DeadLetters => Set<DeadLetter>();
 
-    public DbSet<EventProcessor> EventProcessors => Set<EventProcessor>();
+    public DbSet<ProcessorInstance> EventProcessors => Set<ProcessorInstance>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
