@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Microsoft.Extensions.Options;
 
 namespace Plugboard.Events.Tests;
 
@@ -16,14 +15,15 @@ internal sealed class SqliteFixture : IDisposable, IDbContextFactory<ShopContext
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
     private readonly EventContextInterceptor _interceptor;
 
-    public SqliteFixture(Action<SubscriptionBuilder>? subscribe = null, int channelCapacity = 100)
+    public SqliteFixture(Action<SubscriptionBuilder>? subscribe = null, int channelCapacity = 100, TimeProvider? time = null)
     {
+        Time = time ?? TimeProvider.System;
         Channel = System.Threading.Channels.Channel.CreateBounded<DeliveryQueueItem>(channelCapacity);
         _connection.Open();
         var builder = new SubscriptionBuilder();
         subscribe?.Invoke(builder);
         Subscriptions = builder.Build();
-        _interceptor = new EventContextInterceptor(Channel, Subscriptions, Options);
+        _interceptor = new EventContextInterceptor(Channel, Subscriptions, Time);
 
         using ShopContext context = CreateDbContext();
         context.Database.EnsureCreated();
@@ -38,7 +38,7 @@ internal sealed class SqliteFixture : IDisposable, IDbContextFactory<ShopContext
 
     public Subscription[] Subscriptions { get; }
 
-    public IOptions<PlugboardEventsOptions> Options { get; } = Microsoft.Extensions.Options.Options.Create(new PlugboardEventsOptions { Host = "host-1" });
+    public TimeProvider Time { get; }
 
     /// <summary>A context as the request scope would get it.</summary>
     public ShopContext CreateScopedContext() => new(ContextOptions().Options);
@@ -75,8 +75,8 @@ internal sealed class SqliteFixture : IDisposable, IDbContextFactory<ShopContext
     private DbContextOptionsBuilder<ShopContext> ContextOptions() => new DbContextOptionsBuilder<ShopContext>().UseSqlite(_connection).UsePlugboardEvents(_interceptor, owner: true).AddInterceptors(Outage);
 }
 
-/// <summary>The context that owns the event tables.</summary>
-internal sealed class ShopContext(DbContextOptions<ShopContext> options) : DbContext(options), IEventStoreContext
+/// <summary>The context that owns the event tables, and publishes too.</summary>
+internal sealed class ShopContext(DbContextOptions<ShopContext> options) : DbContext(options), IEventStoreContext, IPublishingContext
 {
     public DbSet<Order> Orders => Set<Order>();
 
@@ -84,11 +84,13 @@ internal sealed class ShopContext(DbContextOptions<ShopContext> options) : DbCon
 
     public DbSet<DeliveryQueueItem> DeliveryQueue => Set<DeliveryQueueItem>();
 
+    public DbSet<DeliveryQueueItem> Deliveries => Set<DeliveryQueueItem>();
+
     public DbSet<DeliveryHistory> DeliveryHistory => Set<DeliveryHistory>();
 
     public DbSet<DeadLetter> DeadLetters => Set<DeadLetter>();
 
-    public DbSet<ProcessorInstance> EventProcessors => Set<ProcessorInstance>();
+    public DbSet<DeliveryNode> DeliveryNodes => Set<DeliveryNode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

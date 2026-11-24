@@ -16,12 +16,10 @@ namespace Plugboard.Events.Tests;
 [TestFixture]
 internal sealed class EventPublisherTests
 {
-    private static readonly InstanceId Host1 = new("host-1");
-
     private static readonly Action<SubscriptionBuilder> TwoSubscriptions = b =>
     {
         SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) => Task.CompletedTask);
-        SubscriptionServices.RegisterAll(b, "audit", (e, ctx, sp, ct) => Task.CompletedTask);
+        SubscriptionServices.Register<OrderPlaced>(b, "audit", (e, ctx, sp, ct) => Task.CompletedTask);
     };
 
     [Test]
@@ -44,8 +42,8 @@ internal sealed class EventPublisherTests
         Assert.That((envelope.Name, envelope.Payload), Is.EqualTo(("order.placed", """{"OrderId":1}""")));
         Assert.That(queue.Select(d => (d.EventId, d.Subscription, d.LockedBy, d.Attempts)), Is.EqualTo(new[]
         {
-            (envelope.Id, "audit", (InstanceId?)Host1, 1),
-            (envelope.Id, "send-confirmation", (InstanceId?)Host1, 1),
+            (envelope.Id, "audit", (NodeId?)NodeId.Current, 1),
+            (envelope.Id, "send-confirmation", (NodeId?)NodeId.Current, 1),
         }), "born reserved for this host's workers, which counts as the first attempt");
         Assert.That(db.Published().Select(d => (d.Subscription, d.Event.Id)), Is.EquivalentTo([("audit", envelope.Id), ("send-confirmation", envelope.Id)]));
     }
@@ -84,7 +82,7 @@ internal sealed class EventPublisherTests
         using BillingPublishingContext billingPublishing = services.GetRequiredService<IDbContextFactory<BillingPublishingContext>>().CreateDbContext();
 
         Assert.That(services.GetServices<IHostedService>().Select(s => s.GetType().GetGenericTypeDefinition()),
-            Is.EqualTo([typeof(InstanceHeartBeatService<>), typeof(DeliveryQueueProcessor<>), typeof(DeliveryQueueSweeper<>)]));
+            Is.EqualTo([typeof(NodeHeartbeatService<>), typeof(DeliveryQueueProcessor<>), typeof(DeliveryQueueSweeper<>)]));
         Assert.That(Interceptors(shop).OfType<EventContextInterceptor>().Count(), Is.EqualTo(1));
         Assert.That(Interceptors(billingPublishing).OfType<EventContextInterceptor>().Count(), Is.EqualTo(1));
         Assert.That(shop.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(DeliveryQueueItem))!.IsTableExcludedFromMigrations(), Is.False, "the context that owns the tables migrates them");
@@ -181,7 +179,8 @@ internal sealed class EventPublisherTests
         connection.Open();
         await using ServiceProvider services = new ServiceCollection()
             .AddDbContextPool<ShopContext>(o => o.UseSqlite(connection))
-            .AddPlugboardEvents<ShopContext>(o => o.Host = "host-1")
+            .AddPlugboardEvents<ShopContext>()
+            .AddEventContext<ShopContext>()
             .AddSubscriptions(b => SubscriptionServices.Register<OrderPlaced>(b, "send-confirmation", (e, ctx, sp, ct) => Task.CompletedTask))
             .BuildServiceProvider(validateScopes: true);
         var channel = services.GetRequiredService<Channel<DeliveryQueueItem>>();
@@ -359,7 +358,7 @@ internal sealed class EventPublisherTests
 
         await using ShopContext check = db.CreateDbContext();
         DeliveryQueueItem row = await check.DeliveryQueue.SingleAsync();
-        Assert.That((row.Subscription, row.LockedBy), Is.EqualTo(("book-invoice", (InstanceId?)Host1)));
+        Assert.That((row.Subscription, row.LockedBy), Is.EqualTo(("book-invoice", (NodeId?)NodeId.Current)));
         Assert.That(db.Published().Single().Event.Name, Is.EqualTo("invoice.issued"));
     }
 
@@ -367,7 +366,7 @@ internal sealed class EventPublisherTests
     public async Task SaveChanges_WhenTheChannelIsFull_ShouldWaitForRoomInsteadOfDropping()
     {
         using var db = new SqliteFixture(TwoSubscriptions, channelCapacity: 1);
-        db.Channel.Writer.TryWrite(new DeliveryQueueItem { EventId = Guid.NewGuid(), Subscription = "filler" });
+        db.Channel.Writer.TryWrite(DeliveryQueueItem.Create(EventEnvelope.Create(new OrderPlaced(0)), "filler", NodeId.Current, DateTimeOffset.UtcNow));
 
         await using ShopContext context = db.CreateScopedContext();
         context.Publish(new OrderPlaced(1));
@@ -398,8 +397,9 @@ internal sealed class EventPublisherTests
         await using ShopContext context = db.CreateDbContext();
         context.Events.Attach(envelope);
         // A finished row moving to history and a failed one to the dead letters, both tracked with their stored event.
-        context.DeliveryHistory.Add(new DeliveryQueueItem { EventId = envelope.Id, Subscription = "audit", Event = envelope }.Reserve(Host1).Finished() with { Event = envelope });
-        context.DeadLetters.Add(new DeliveryQueueItem { EventId = envelope.Id, Subscription = "send-confirmation", Event = envelope }.Reserve(Host1).DeadLettered(new TimeoutException()) with { Event = envelope });
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        context.DeliveryHistory.Add(DeliveryHistory.Create(DeliveryQueueItem.Create(envelope, "audit", NodeId.Current, now), now));
+        context.DeadLetters.Add(DeadLetter.Create(DeliveryQueueItem.Create(envelope, "send-confirmation", NodeId.Current, now), "System.TimeoutException", now));
         await context.SaveChangesAsync();
 
         Assert.That(db.Published(), Is.Empty);
@@ -419,7 +419,7 @@ internal sealed class EventPublisherTests
 
         await using ShopContext context = db.CreateDbContext();
         List<DeliveryQueueItem> loaded = await context.DeliveryQueue.Include(d => d.Event).ToListAsync();
-        context.DeliveryQueue.Attach(new DeliveryQueueItem { EventId = loaded[0].EventId, Subscription = "attached", Event = loaded[0].Event }.Reserve(Host1));
+        context.DeliveryQueue.Attach(DeliveryQueueItem.Create(loaded[0].Event, "attached", NodeId.Current, DateTimeOffset.UtcNow));
         context.Orders.Add(new Order { Id = 2 });
         await context.SaveChangesAsync();
 

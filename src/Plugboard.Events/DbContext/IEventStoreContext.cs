@@ -14,8 +14,8 @@ public interface IEventStoreContext
     /// <summary>The deliveries that failed for the last time.</summary>
     DbSet<DeadLetter> DeadLetters { get; }
 
-    /// <summary>The hosts running the processor and their last heartbeat.</summary>
-    DbSet<ProcessorInstance> EventProcessors { get; }
+    /// <summary>The nodes running the processor and their last heartbeat.</summary>
+    DbSet<DeliveryNode> DeliveryNodes { get; }
 
     /// <summary>Published events</summary>
     DbSet<EventEnvelope> Events { get; }

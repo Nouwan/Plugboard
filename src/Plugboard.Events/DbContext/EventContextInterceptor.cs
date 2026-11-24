@@ -12,11 +12,11 @@ namespace Plugboard.Events;
 /// inserts, and hands the deliveries to this host's channel once they are committed: at the end of a plain save, or
 /// when the transaction the save ran in is committed.
 /// </summary>
-internal sealed class EventContextInterceptor(Channel<DeliveryQueueItem> channel, IEnumerable<Subscription> subscriptions)
+internal sealed class EventContextInterceptor(Channel<DeliveryQueueItem> channel, IEnumerable<Subscription> subscriptions, TimeProvider time)
     : SaveChangesInterceptor, IDbTransactionInterceptor
 {
     private readonly Subscription[] _subscriptions = [.. subscriptions];
-    private readonly InstanceId _instance = InstanceId.Current;
+    private readonly NodeId _node = NodeId.Current;
     private readonly ConditionalWeakTable<DbContext, Batch> _batches = [];
 
     /// <inheritdoc/>
@@ -97,7 +97,7 @@ internal sealed class EventContextInterceptor(Channel<DeliveryQueueItem> channel
             events.AddRange(outbox.Drain());
         }
 
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = time.GetUtcNow();
         List<EventEnvelope> inserted = [.. context.ChangeTracker.Entries<EventEnvelope>()
             .Where(entry => entry.State == EntityState.Added && !delivered.Contains(entry.Entity.Id))
             .Select(static entry => entry.Entity)];
@@ -107,7 +107,7 @@ internal sealed class EventContextInterceptor(Channel<DeliveryQueueItem> channel
             foreach (Subscription subscription in _subscriptions.Where(s => s.EventName is null || s.EventName == envelope.Name))
             {
                 // Born reserved for this host's workers: the first attempt counts from here.
-                var delivery = DeliveryQueueItem.Create(envelope, subscription.Name, _instance);
+                var delivery = DeliveryQueueItem.Create(envelope, subscription.Name, _node, now);
                 queue.Add(delivery);
                 batch.Saving.Add(delivery);
             }

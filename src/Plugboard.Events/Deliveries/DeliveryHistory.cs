@@ -23,9 +23,9 @@ public sealed record DeliveryHistory
     public DateTimeOffset FinishedAt { get; }
     public required EventEnvelope Event { get; init; }
 
-    public static DeliveryHistory Create(DeliveryQueueItem item)
+    public static DeliveryHistory Create(DeliveryQueueItem item, DateTimeOffset now)
     {
-        return new DeliveryHistory(item.Id, item.EventId, item.Subscription, item.Attempts, DateTimeOffset.UtcNow)
+        return new DeliveryHistory(item.Id, item.EventId, item.Subscription, item.Attempts, now)
         {
             Event = item.Event,
         };

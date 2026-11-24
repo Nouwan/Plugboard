@@ -14,7 +14,8 @@ internal sealed partial class DeliveryQueueProcessor<TContext>(
     ILogger<DeliveryQueueProcessor<TContext>> logger,
     IEnumerable<Subscription> subscriptions,
     IServiceScopeFactory scopes,
-    IOptions<PlugboardEventsOptions> options) : BackgroundService
+    IOptions<PlugboardEventsOptions> options,
+    TimeProvider time) : BackgroundService
     where TContext : DbContext, IEventStoreContext
 {
     private readonly PlugboardEventsOptions _options = options.Value;
@@ -44,7 +45,7 @@ internal sealed partial class DeliveryQueueProcessor<TContext>(
         if (!_subscriptions.TryGetValue(delivery.Subscription, out Subscription? subscription))
         {
             await context.DeadLetterAsync(delivery,
-                    $"No subscription named '{delivery.Subscription}' is registered on this host.", stoppingToken)
+                    $"No subscription named '{delivery.Subscription}' is registered on this host.", time.GetUtcNow(), stoppingToken)
                 .ConfigureAwait(false);
             return;
         }
@@ -52,7 +53,7 @@ internal sealed partial class DeliveryQueueProcessor<TContext>(
         if (delivery.Attempts > subscription.MaxAttempts)
         {
             await context.DeadLetterAsync(delivery,
-                    $"Attempt {delivery.Attempts} is past the limit of {subscription.MaxAttempts}.", stoppingToken)
+                    $"Attempt {delivery.Attempts} is past the limit of {subscription.MaxAttempts}.", time.GetUtcNow(), stoppingToken)
                 .ConfigureAwait(false);
             return;
         }
@@ -73,15 +74,15 @@ internal sealed partial class DeliveryQueueProcessor<TContext>(
         {
             if (delivery.Attempts >= subscription.MaxAttempts)
             {
-                await context.DeadLetterAsync(delivery, exception, stoppingToken);
+                await context.DeadLetterAsync(delivery, exception, time.GetUtcNow(), stoppingToken);
                 return;
             }
 
-            await context.RetryAsync(delivery, stoppingToken);
+            await context.RetryAsync(delivery, time.GetUtcNow(), stoppingToken);
             return;
         }
 
-        await context.FinishAsync(delivery, stoppingToken).ConfigureAwait(false);
+        await context.FinishAsync(delivery, time.GetUtcNow(), stoppingToken).ConfigureAwait(false);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

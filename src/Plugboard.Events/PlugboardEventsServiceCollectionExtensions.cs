@@ -16,7 +16,7 @@ public static class PlugboardEventsServiceCollectionExtensions
     {
         services.AddOptions<PlugboardEventsOptions>()
             .Validate(static o => o.SweepInterval > TimeSpan.Zero, "SweepInterval must be positive.")
-            .Validate(static o => o.HostTimeout > TimeSpan.Zero, "HostTimeout must be positive.")
+            .Validate(static o => o.NodeTimeout > TimeSpan.Zero, "NodeTimeout must be positive.")
             .Validate(static o => o.Concurrency > 0, "Concurrency must be positive.")
             .Validate(static o => o.ChannelCapacity > 0, "ChannelCapacity must be positive.")
             .ValidateOnStart();
@@ -34,10 +34,10 @@ public static class PlugboardEventsServiceCollectionExtensions
         }));
         // Started in this order and stopped in reverse: the host row exists before any row is reserved and outlives
         // the processor's release; the sweeper stops publishing before the processor stops reading.
-        services.AddHostedService<InstanceHeartBeatService<TContext>>();
+        services.AddHostedService<NodeHeartbeatService<TContext>>();
         services.AddHostedService<DeliveryQueueProcessor<TContext>>();
         services.AddHostedService<DeliveryQueueSweeper<TContext>>();
-        return services.AddEventContext<TContext>();
+        return services;
     }
 
     /// <summary>

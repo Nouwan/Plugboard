@@ -6,10 +6,10 @@ internal static class EventStoreExtensions
 {
     private static readonly int[] BackoffInMinutes = [1, 2, 5, 10, 15, 30, 60];
 
-    private static DateTimeOffset Backoff(int attempts)
+    private static DateTimeOffset Backoff(int attempts, DateTimeOffset now)
     {
         int index = Math.Clamp(attempts - 1, 0, BackoffInMinutes.Length - 1);
-        return DateTimeOffset.UtcNow.AddMinutes(BackoffInMinutes[index]);
+        return now.AddMinutes(BackoffInMinutes[index]);
     }
 
     extension<TContext>(TContext context) where TContext : DbContext, IEventStoreContext
@@ -26,33 +26,33 @@ internal static class EventStoreExtensions
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        internal async Task FinishAsync(DeliveryQueueItem delivery, CancellationToken ct)
+        internal async Task FinishAsync(DeliveryQueueItem delivery, DateTimeOffset now, CancellationToken ct)
         {
             context.DeliveryQueue.Remove(delivery);
-            context.DeliveryHistory.Add(DeliveryHistory.Create(delivery));
+            context.DeliveryHistory.Add(DeliveryHistory.Create(delivery, now));
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        internal Task DeadLetterAsync(DeliveryQueueItem delivery, Exception exception, CancellationToken ct) =>
-            context.DeadLetterAsync(delivery, $"{exception.GetType().FullName}: {exception.Message}", ct);
+        internal Task DeadLetterAsync(DeliveryQueueItem delivery, Exception exception, DateTimeOffset now, CancellationToken ct) =>
+            context.DeadLetterAsync(delivery, $"{exception.GetType().FullName}: {exception.Message}", now, ct);
 
-        internal async Task DeadLetterAsync(DeliveryQueueItem delivery, string error, CancellationToken ct)
+        internal async Task DeadLetterAsync(DeliveryQueueItem delivery, string error, DateTimeOffset now, CancellationToken ct)
         {
             context.DeliveryQueue.Remove(delivery);
-            context.DeadLetters.Add(DeadLetter.Create(delivery, error));
+            context.DeadLetters.Add(DeadLetter.Create(delivery, error, now));
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        internal async Task RetryAsync(DeliveryQueueItem delivery, CancellationToken ct)
+        internal async Task RetryAsync(DeliveryQueueItem delivery, DateTimeOffset now, CancellationToken ct)
         {
-            DateTimeOffset notBefore = Backoff(delivery.Attempts);
-            delivery.Retry(notBefore);
+            DateTimeOffset notBefore = Backoff(delivery.Attempts, now);
+            delivery.Retry(notBefore, now);
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        internal async Task ReserveAsync(DeliveryQueueItem delivery, InstanceId instance, CancellationToken ct)
+        internal async Task ReserveAsync(DeliveryQueueItem delivery, NodeId node, DateTimeOffset now, CancellationToken ct)
         {
-            delivery.Reserve(instance);
+            delivery.Reserve(node, now);
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using static Plugboard.Events.Jitter;
 
 namespace Plugboard.Events;
 
@@ -21,24 +22,63 @@ internal sealed partial class DeliveryQueueSweeper<TContext>(
     internal const int BatchSize = 5;
 
     private readonly PlugboardEventsOptions _options = options.Value;
-    private readonly InstanceId _instance = InstanceId.Current;
-
-    private static TimeSpan Jittered(TimeSpan interval)
-    {
-        long shortest = (long)Math.Floor(interval.TotalMilliseconds * 0.8);
-        long longest = (long)Math.Ceiling(interval.TotalMilliseconds * 1.2);
-
-        var delay = Random.Shared.NextInt64(shortest, longest);
-        return TimeSpan.FromMilliseconds(delay);
-    }
+    private readonly NodeId _node = NodeId.Current;
 
     private async Task SweepAsync(CancellationToken ct)
     {
+        await RemoveDeadNodesAsync(ct).ConfigureAwait(false);
+        await FreeDeliveriesWithoutNodeAsync(ct).ConfigureAwait(false);
+
         int postponed = await RepeatUntilEmptyAsync(SweepPostponedAsync, ct).ConfigureAwait(false);
         int unclaimed = await RepeatUntilEmptyAsync(SweepUnclaimedAsync, ct).ConfigureAwait(false);
         int created = await RepeatUntilEmptyAsync(SweepNewAsync, ct).ConfigureAwait(false);
 
         LogSwept(postponed + unclaimed + created);
+    }
+
+    private async Task RemoveDeadNodesAsync(CancellationToken ct)
+    {
+        DateTimeOffset lastSeenBefore = time.GetUtcNow() - _options.NodeTimeout;
+        await using TContext context = await contexts.CreateDbContextAsync(ct).ConfigureAwait(false);
+
+        await context.DeliveryNodes
+            .Where(node => node.LastSeen < lastSeenBefore)
+            .ExecuteDeleteAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    private async Task FreeDeliveriesWithoutNodeAsync(CancellationToken ct)
+    {
+        DateTimeOffset now = time.GetUtcNow();
+        await using TContext context = await contexts.CreateDbContextAsync(ct).ConfigureAwait(false);
+
+        NodeId[] owners = await context.DeliveryQueue
+            .Where(delivery => delivery.LockedBy != null)
+            .Select(delivery => delivery.LockedBy!.Value)
+            .Distinct()
+            .ToArrayAsync(ct)
+            .ConfigureAwait(false);
+
+        NodeId[] nodes = await context.DeliveryNodes
+            .Select(node => node.Id)
+            .ToArrayAsync(ct)
+            .ConfigureAwait(false);
+
+        NodeId[] ownersWithoutNode = [.. owners.Except(nodes)];
+
+        if (ownersWithoutNode.Length == 0)
+        {
+            return;
+        }
+
+        int freed = await context.DeliveryQueue
+            .Where(delivery => (delivery.LockedBy != null) && ownersWithoutNode.Contains(delivery.LockedBy.Value))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(delivery => delivery.LockedBy, (NodeId?)null)
+                .SetProperty(delivery => delivery.UpdatedAt, now), ct)
+            .ConfigureAwait(false);
+
+        LogFreed(freed);
     }
 
     private static async Task<int> RepeatUntilEmptyAsync(Func<CancellationToken, Task<int>> sweepPage,
@@ -63,7 +103,7 @@ internal sealed partial class DeliveryQueueSweeper<TContext>(
 
         List<DeliveryQueueItem> page = await context.DeliveryQueue
             .Include(d => d.Event)
-            .Where(d => (d.LockedBy == _instance) && (d.NotBefore <= now))
+            .Where(d => (d.LockedBy == _node) && (d.NotBefore <= now))
             .OrderBy(d => d.NotBefore)
             .Take(BatchSize)
             .ToListAsync(ct)
@@ -120,7 +160,7 @@ internal sealed partial class DeliveryQueueSweeper<TContext>(
 
     private async Task PublishAsync(TContext context, DeliveryQueueItem delivery, CancellationToken cancellationToken)
     {
-        await context.ReserveAsync(delivery, _instance, cancellationToken).ConfigureAwait(false);
+        await context.ReserveAsync(delivery, _node, time.GetUtcNow(), cancellationToken).ConfigureAwait(false);
         context.Entry(delivery).State = EntityState.Detached;
         await channel.Writer.WriteAsync(delivery, cancellationToken).ConfigureAwait(false);
     }
@@ -143,6 +183,10 @@ internal sealed partial class DeliveryQueueSweeper<TContext>(
             timer.Period = Jittered(_options.SweepInterval);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Freed {Freed} deliveries of nodes without a live heartbeat")]
+    private partial void LogFreed(int freed);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Swept {Published} due deliveries into the channel")]
     private partial void LogSwept(int published);

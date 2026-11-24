@@ -7,10 +7,10 @@ namespace Plugboard.Events.Tests;
 
 /// <summary>The processor, sweeper and heartbeat against the real tables, on SQLite.</summary>
 [TestFixture]
-internal sealed class ProcessorInstanceTests
+internal sealed class DeliveryNodeTests
 {
-    private static readonly InstanceId Host1 = new("host-1");
-    private static readonly InstanceId Host2 = new("host-2");
+    private static readonly NodeId Host1 = new("host-1");
+    private static readonly NodeId Host2 = new("host-2");
     private static readonly DateTimeOffset Now = new(2026, 10, 24, 12, 0, 0, TimeSpan.Zero);
 
     [Event("order.placed")]
@@ -42,11 +42,11 @@ internal sealed class ProcessorInstanceTests
                 Time, Microsoft.Extensions.Options.Options.Create(Options), NullLogger<DeliveryQueueProcessor<ShopContext>>.Instance);
         }
 
-        public DeliveryQueueSweeper<ShopContext> BuildSweeper(InstanceId? host = null) =>
+        public DeliveryQueueSweeper<ShopContext> BuildSweeper(NodeId? host = null) =>
             new(Db, Db.Channel, Microsoft.Extensions.Options.Options.Create(host is null ? Options : new PlugboardEventsOptions { Host = host.Value.Value }), Time, NullLogger<DeliveryQueueSweeper<ShopContext>>.Instance);
 
-        public InstanceHeartBeatService<ShopContext> BuildHeartbeat() =>
-            new(Db, Microsoft.Extensions.Options.Options.Create(Options), Time, NullLogger<InstanceHeartBeatService<ShopContext>>.Instance);
+        public NodeHeartbeatService<ShopContext> BuildHeartbeat() =>
+            new(Db, Microsoft.Extensions.Options.Options.Create(Options), Time, NullLogger<NodeHeartbeatService<ShopContext>>.Instance);
 
         /// <summary>Seeds one delivery of <see cref="Envelope"/> for send-confirmation, reserved for this host unless given.</summary>
         public async Task<DeliveryQueueItem> Seed(DeliveryQueueItem? delivery = null) =>
@@ -67,7 +67,7 @@ internal sealed class ProcessorInstanceTests
             return deliveryQueueItem with { EventId = envelope.Id, Event = envelope };
         }
 
-        public async Task Seed(params ProcessorInstance[] hosts)
+        public async Task Seed(params DeliveryNode[] hosts)
         {
             await using ShopContext context = Db.CreateDbContext();
             context.Instances.AddRange(hosts);
@@ -104,7 +104,7 @@ internal sealed class ProcessorInstanceTests
 
         public static DeliveryQueueItem Unstamped(DeliveryQueueItem row) => row with { UpdatedAt = default };
 
-        public async Task<List<ProcessorInstance>> Hosts()
+        public async Task<List<DeliveryNode>> Hosts()
         {
             await using ShopContext context = Db.CreateDbContext();
             return await context.Instances.AsNoTracking().OrderBy(h => h.Id).ToListAsync();
@@ -476,9 +476,9 @@ internal sealed class ProcessorInstanceTests
     public async Task HeartbeatThenSweep_ShouldRecoverADeadHostsRetryWhenItIsDue()
     {
         using var h = new Harness();
-        h.Options.HostTimeout = TimeSpan.FromMinutes(5);
-        var dead = new InstanceId("dead");
-        await h.Seed(new ProcessorInstance(dead, Now.AddMinutes(-10)));
+        h.Options.NodeTimeout = TimeSpan.FromMinutes(5);
+        var dead = new NodeId("dead");
+        await h.Seed(new DeliveryNode(dead, Now.AddMinutes(-10)));
         DeliveryQueueItem retry = await h.Seed(h.Free().Reserve(dead).Defer(Now.AddMinutes(1)));
 
         await h.BuildHeartbeat().StartAsync(CancellationToken.None);
@@ -496,11 +496,11 @@ internal sealed class ProcessorInstanceTests
     public async Task HeartbeatStart_ShouldWriteTheHostFreeRowsOfStaleAndUnknownHostsAndForgetThem()
     {
         using var h = new Harness();
-        h.Options.HostTimeout = TimeSpan.FromMinutes(5);
-        var alive = new InstanceId("alive");
-        var stale = new InstanceId("stale");
-        var unknown = new InstanceId("unknown");
-        await h.Seed(new ProcessorInstance(alive, Now.AddMinutes(-1)), new ProcessorInstance(stale, Now.AddMinutes(-10)));
+        h.Options.NodeTimeout = TimeSpan.FromMinutes(5);
+        var alive = new NodeId("alive");
+        var stale = new NodeId("stale");
+        var unknown = new NodeId("unknown");
+        await h.Seed(new DeliveryNode(alive, Now.AddMinutes(-1)), new DeliveryNode(stale, Now.AddMinutes(-10)));
         DeliveryQueueItem ofAlive = await h.Seed(h.Free().Reserve(alive));
         DeliveryQueueItem ofStale = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(stale));
         DeliveryQueueItem ofUnknown = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(unknown));
@@ -512,7 +512,7 @@ internal sealed class ProcessorInstanceTests
         Assert.That(Harness.Unstamped(await h.Row(ofStale)), Is.EqualTo(Harness.Unstamped(ofStale.FreeLock())), "freed, the attempt it was handed out for still counts");
         Assert.That((await h.Row(ofUnknown)).LockedBy, Is.Null, "an owner without a heartbeat row is as dead as a stale one");
         Assert.That(await h.Row(free), Is.EqualTo(free));
-        Assert.That(await h.Hosts(), Is.EqualTo([new ProcessorInstance(alive, Now.AddMinutes(-1)), new ProcessorInstance(Host1, Now)]));
+        Assert.That(await h.Hosts(), Is.EqualTo([new DeliveryNode(alive, Now.AddMinutes(-1)), new DeliveryNode(Host1, Now)]));
     }
 
     [Test]
@@ -520,15 +520,15 @@ internal sealed class ProcessorInstanceTests
     {
         using var h = new Harness();
         h.Time.UseSystemTimers = true;
-        h.Options.HostTimeout = TimeSpan.FromMilliseconds(60); // Beats every 10 ms.
-        InstanceHeartBeatService<ShopContext> heartbeat = h.BuildHeartbeat();
+        h.Options.NodeTimeout = TimeSpan.FromMilliseconds(60); // Beats every 10 ms.
+        NodeHeartbeatService<ShopContext> heartbeat = h.BuildHeartbeat();
 
         await heartbeat.StartAsync(CancellationToken.None);
-        Assert.That(await h.Hosts(), Is.EqualTo([new ProcessorInstance(Host1, Now)]), "written before anything else starts");
+        Assert.That(await h.Hosts(), Is.EqualTo([new DeliveryNode(Host1, Now)]), "written before anything else starts");
 
         // host-2 died with a delivery at a worker; its heartbeat is two minutes old, so only a later beat can free it.
         DeliveryQueueItem dead = await h.Seed(h.Free().Reserve(Host2));
-        await h.Seed(new ProcessorInstance(Host2, Now.AddMinutes(-2)));
+        await h.Seed(new DeliveryNode(Host2, Now.AddMinutes(-2)));
 
         DeliveryQueueItem freed = await Eventually(() => h.Row(dead), row => row.LockedBy is null);
 
@@ -543,11 +543,11 @@ internal sealed class ProcessorInstanceTests
     public async Task HeartbeatStop_ShouldReleaseTheRowsThisHostOwnsAndForgetTheHost()
     {
         using var h = new Harness();
-        await h.Seed(new ProcessorInstance(Host2, Now));
+        await h.Seed(new DeliveryNode(Host2, Now));
         DeliveryQueueItem withWorker = await h.Seed(h.Free().Reserve(Host1));
         DeliveryQueueItem retry = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1).Defer(Now.AddMinutes(1)));
         DeliveryQueueItem other = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host2));
-        InstanceHeartBeatService<ShopContext> heartbeat = h.BuildHeartbeat();
+        NodeHeartbeatService<ShopContext> heartbeat = h.BuildHeartbeat();
 
         await heartbeat.StartAsync(CancellationToken.None);
         await heartbeat.StopAsync(CancellationToken.None);
@@ -572,7 +572,7 @@ internal sealed class ProcessorInstanceTests
         h.Db.Channel.Writer.TryWrite(await h.Seed());
         DeliveryQueueItem queued = await h.Seed(Harness.AnotherEvent(), h.Free().Reserve(Host1));
 
-        InstanceHeartBeatService<ShopContext> heartbeat = h.BuildHeartbeat();
+        NodeHeartbeatService<ShopContext> heartbeat = h.BuildHeartbeat();
         await heartbeat.StartAsync(CancellationToken.None);
         await processor.StartAsync(CancellationToken.None);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -581,8 +581,8 @@ internal sealed class ProcessorInstanceTests
 
         Assert.That((await h.Queue()).Select(r => (r.EventId, r.LockedBy, r.Attempts)), Is.EquivalentTo(new[]
         {
-            (h.Envelope.Id, (InstanceId?)null, 1),
-            (queued.EventId, (InstanceId?)null, 1),
+            (h.Envelope.Id, (NodeId?)null, 1),
+            (queued.EventId, (NodeId?)null, 1),
         }));
         Assert.That(await h.Hosts(), Is.Empty);
     }

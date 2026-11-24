@@ -25,9 +25,9 @@ public sealed class DeadLetter
     public string Error { get; }
     public DateTimeOffset FailedAt { get; }
 
-    internal static DeadLetter Create(DeliveryQueueItem item, string error)
+    internal static DeadLetter Create(DeliveryQueueItem item, string error, DateTimeOffset now)
     {
-        return new DeadLetter(item.Id, item.EventId, item.Subscription, item.Attempts, error, DateTimeOffset.UtcNow)
+        return new DeadLetter(item.Id, item.EventId, item.Subscription, item.Attempts, error, now)
         {
             Event = item.Event,
         };

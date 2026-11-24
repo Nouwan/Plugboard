@@ -6,8 +6,8 @@ public sealed class PlugboardEventsOptions
     /// <summary>How often this host sweeps the queue for due deliveries nobody owns.</summary>
     public TimeSpan SweepInterval { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>A host without a heartbeat for this long is taken for dead and its deliveries are freed.</summary>
-    public TimeSpan HostTimeout { get; set; } = TimeSpan.FromMinutes(1);
+    /// <summary>A node without a heartbeat for this long is taken for dead and its deliveries are freed.</summary>
+    public TimeSpan NodeTimeout { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>How many deliveries this host runs at the same time.</summary>
     public int Concurrency { get; set; } = 8;

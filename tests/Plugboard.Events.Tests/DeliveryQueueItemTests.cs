@@ -5,7 +5,7 @@ namespace Plugboard.Events.Tests;
 [TestFixture]
 internal sealed class DeliveryQueueItemTests
 {
-    private static readonly InstanceId Host1 = new("host-1");
+    private static readonly NodeId Host1 = new("host-1");
     private static readonly DateTimeOffset Now = new(2026, 10, 23, 12, 0, 0, TimeSpan.Zero);
 
     private static readonly DeliveryQueueItem Free = new() { EventId = Guid.NewGuid(), Subscription = "send-confirmation" };
